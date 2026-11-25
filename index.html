@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cut,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Summit">
+<meta name="theme-color" content="#0f1f1a">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-512.png">
+<title>Summit – Peaks Fitness Coach</title>
+<style>
+:root{--bg:#0f1f1a;--card:rgba(22,40,34,.88);--ink:#eef3ea;--mute:#9fb3a6;--line:rgba(190,215,195,.13);--gold:#e8b23a;--sky:#6fb6d9;--snow:#f4f7f2;--red:#e0664f;--green:#6cc489;--p:#6fb6d9;--c:#e8b23a;--f:#d9826f}
+body.light{--bg:#eef0e6;--card:rgba(255,255,252,.92);--ink:#1c2b24;--mute:#5d6f63;--line:rgba(40,70,50,.14)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}
+#topo{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.55}
+header{position:sticky;top:0;z-index:5;padding:calc(env(safe-area-inset-top) + 10px) 18px 10px;background:linear-gradient(var(--bg) 70%,transparent);display:flex;justify-content:space-between;align-items:flex-end}
+header h1{margin:0;font-size:26px;letter-spacing:.5px}
+header small{color:var(--mute);display:block;font-size:12px;text-transform:uppercase;letter-spacing:1.5px}
+main{position:relative;z-index:1;padding:0 14px calc(env(safe-area-inset-bottom) + 90px)}
+.view{display:none}.view.on{display:block;animation:rise .35s ease}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px;margin:0 0 14px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.card h2{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:1.4px;color:var(--mute);display:flex;justify-content:space-between;align-items:center}
+.big{font-size:34px;font-weight:700;line-height:1}
+.mute{color:var(--mute)}.small{font-size:12px}
+.row{display:flex;gap:10px;align-items:center}.between{justify-content:space-between}.wrap{flex-wrap:wrap}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+button,.btn{background:var(--gold);color:#1b1505;border:0;border-radius:14px;padding:11px 15px;font-weight:700;font-size:15px}
+button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+button.sm{padding:6px 10px;font-size:13px;border-radius:10px}
+button.danger{background:var(--red);color:#fff}
+input,select,textarea{width:100%;background:rgba(0,0,0,.18);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:10px;font-size:16px;font-family:inherit}
+body.light input,body.light select,body.light textarea{background:#fff}
+label{font-size:12px;color:var(--mute);display:block;margin:8px 0 4px}
+nav{position:fixed;bottom:0;left:0;right:0;z-index:6;display:flex;justify-content:space-around;padding:8px 6px calc(env(safe-area-inset-bottom) + 6px);background:var(--card);border-top:1px solid var(--line);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+nav button{background:none;color:var(--mute);font-size:11px;font-weight:600;padding:4px 8px;display:flex;flex-direction:column;align-items:center;gap:2px}
+nav button svg{width:24px;height:24px}
+nav button.on{color:var(--gold)}
+.ring-wrap{display:flex;align-items:center;gap:16px}
+.bar{height:10px;background:rgba(255,255,255,.08);border-radius:6px;overflow:hidden}
+.bar>i{display:block;height:100%;border-radius:6px;transition:width .6s}
+.macro{margin:8px 0}
+.list>div{padding:10px 0;border-bottom:1px solid var(--line)}.list>div:last-child{border:0}
+.pill{display:inline-block;padding:3px 9px;border-radius:20px;font-size:12px;font-weight:600;background:rgba(232,178,58,.18);color:var(--gold)}
+.pill.blue{background:rgba(111,182,217,.18);color:var(--sky)}.pill.red{background:rgba(224,102,79,.2);color:var(--red)}.pill.green{background:rgba(108,196,137,.2);color:var(--green)}
+.sheet{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.55);display:none;align-items:flex-end}
+.sheet.on{display:flex}
+.sheet>div{background:var(--bg);width:100%;max-height:92vh;overflow:auto;border-radius:24px 24px 0 0;padding:18px 16px calc(env(safe-area-inset-bottom) + 20px);border-top:1px solid var(--line)}
+.tip{border-left:3px solid var(--gold);padding:6px 0 6px 12px;margin:8px 0}
+.seg{display:flex;background:rgba(0,0,0,.2);border-radius:12px;padding:3px}
+.seg button{flex:1;background:none;color:var(--mute);padding:8px;font-size:13px}
+.seg button.on{background:var(--gold);color:#1b1505}
+.zones{display:flex;height:12px;border-radius:6px;overflow:hidden;margin-top:6px}
+.badge{display:inline-flex;flex-direction:column;align-items:center;width:72px;margin:4px;font-size:11px;text-align:center;opacity:.35}
+.badge.got{opacity:1}.badge b{font-size:26px}
+#reader{width:100%;border-radius:14px;overflow:hidden}
+.toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 14px);transform:translateX(-50%);background:var(--gold);color:#1b1505;padding:10px 16px;border-radius:14px;font-weight:700;z-index:50;display:none}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:6px 4px;border-bottom:1px solid var(--line);text-align:left}
+.flag{color:var(--red);font-weight:700}
+</style>
+</head>
+<body>
+<svg id="topo" preserveAspectRatio="xMidYMid slice"></svg>
+<div class="toast" id="toast"></div>
+<header><div><small id="hdrSub">San Francisco Peaks</small><h1 id="hdrTitle">Today</h1></div><div class="right small mute" id="hdrRace"></div></header>
+
+<main>
+<!-- TODAY -->
+<section class="view on" id="v-today">
+  <div class="card">
+    <h2><span>Today's Fuel</span><span class="row"><button class="sm ghost" onclick="shiftDay(-1)">‹</button><span id="dayLbl"></span><button class="sm ghost" onclick="shiftDay(1)">›</button></span></h2>
+    <div class="ring-wrap"><svg id="ring" width="120" height="120" viewBox="0 0 120 120"></svg>
+      <div style="flex:1"><div class="big" id="kcalLeft">0</div><div class="mute small">kcal remaining</div>
+        <div class="small" style="margin-top:6px"><span id="kcalEaten">0</span> eaten · goal <b id="kcalGoal">0</b></div>
+        <div style="margin-top:6px" id="phasePill"></div></div></div>
+    <div id="macroBars"></div>
+  </div>
+  <div id="bpPrompt"></div>
+  <div class="card"><h2><span>Meals</span><span class="row"><button class="sm ghost" onclick="copyYesterday()">Copy yesterday</button></span></h2><div id="meals"></div></div>
+  <div class="card"><h2>Coach's Tip</h2><div id="tipToday"></div></div>
+</section>
+
+<!-- TRAIN -->
+<section class="view" id="v-train">
+  <div class="card"><h2><span>Strava</span><span id="syncState" class="small"></span></h2>
+    <div class="row wrap"><button onclick="stravaSync()">⟳ Sync</button><button class="ghost" onclick="openSheet('otfSheet')">Paste OTF email</button></div>
+    <div class="small mute" id="lastSync" style="margin-top:8px"></div></div>
+  <div class="card"><h2>Fitness · Fatigue · Form</h2><div class="grid3" id="ffm"></div><svg id="loadChart" width="100%" height="90" style="margin-top:10px"></svg></div>
+  <div class="card"><h2>Elevation Earned</h2><div id="elev"></div></div>
+  <div class="card"><h2>This Week</h2><div id="week"></div></div>
+  <div class="card"><h2>Recent Activities</h2><div class="list" id="acts"></div></div>
+  <div class="card"><h2>Trail Badges</h2><div id="badges"></div></div>
+</section>
+
+<!-- RACE -->
+<section class="view" id="v-race">
+  <div class="card" id="summitCard"></div>
+  <div class="card"><h2>Prediction</h2><div id="predict"></div></div>
+  <div class="card"><h2>Coach's Plan</h2><div id="plan"></div></div>
+  <div class="card"><h2><span>Races</span><button class="sm" onclick="editRace()">+ Race</button></h2><div class="list" id="races"></div></div>
+</section>
+
+<!-- HEALTH -->
+<section class="view" id="v-health">
+  <div class="card"><h2><span>Body Comp (OTF)</span><button class="sm" onclick="openSheet('bcSheet')">+ Scan</button></h2><div id="bc"></div></div>
+  <div class="card"><h2><span>Blood Pressure</span><button class="sm" onclick="openSheet('bpSheet')">+ BP</button></h2><div id="bp"></div></div>
+  <div class="card"><h2><span>Lab Results</span><button class="sm" onclick="openSheet('labSheet')">+ Labs</button></h2><div id="labs"></div></div>
+</section>
+
+<!-- SETTINGS -->
+<section class="view" id="v-set">
+  <div class="card"><h2>Calorie Plan</h2>
+    <div class="seg" id="phaseSeg"><button data-p="build">⛰ Load (step up)</button><button data-p="hold">⛺ Hold</button><button data-p="cut">⬇ Cut (step down)</button></div>
+    <div class="grid2"><div><label>Current weekly target (kcal)</label><input id="s_kcal" type="number"></div><div><label>Step per week (kcal)</label><input id="s_step" type="number"></div>
+    <div><label>Ceiling</label><input id="s_ceil" type="number"></div><div><label>Floor</label><input id="s_floor" type="number"></div></div>
+    <label><input type="checkbox" id="s_auto" style="width:auto"> Auto-flip at ceiling/floor (load → cut → load)</label>
+    <div id="planHist" class="small mute" style="margin-top:8px"></div></div>
+  <div class="card"><h2>Macros</h2>
+    <div class="seg" id="mmSeg"><button data-m="ratio">Ratio only</button><button data-m="both">Protein g/lb + ratio</button></div>
+    <div class="grid3"><div><label>Protein %</label><input id="s_rp" type="number"></div><div><label>Carb %</label><input id="s_rc" type="number"></div><div><label>Fat %</label><input id="s_rf" type="number"></div></div>
+    <div class="grid2"><div><label>Protein g / lb bodyweight</label><input id="s_gpl" type="number" step="0.05"></div><div><label>Bodyweight (lb)</label><input id="s_wt" type="number" step="0.1"></div></div>
+    <div class="small mute">In "both" mode protein is set by g/lb; remaining calories split by your carb:fat ratio.</div></div>
+  <div class="card"><h2>Heart Rate</h2><div class="grid3"><div><label>Max HR (Garmin)</label><input id="s_mhr" type="number"></div><div><label>OTF Max HR</label><input id="s_omhr" type="number"></div><div><label>Resting HR</label><input id="s_rhr" type="number"></div></div>
+    <div class="small mute">Splat estimate = minutes ≥ 84% of OTF max HR. Calibrates when you paste real OTF emails (factor: <b id="calib"></b>).</div></div>
+  <div class="card"><h2>Strava Connection</h2>
+    <label>Client ID</label><input id="s_cid"><label>Client Secret (stays on this phone)</label><input id="s_csec" type="password">
+    <label>API base URL</label><input id="s_api">
+    <div class="row wrap" style="margin-top:10px"><button onclick="stravaConnect()">Connect Strava</button><button class="ghost" onclick="pasteCode()">Paste auth code</button></div>
+    <div class="small mute" id="stravaStatus" style="margin-top:8px"></div></div>
+  <div class="card"><h2>Look & Data</h2>
+    <div class="row wrap"><button class="ghost" onclick="toggleTheme()">Light / Dark</button><button class="ghost" onclick="exportData()">Backup</button><button class="ghost" onclick="document.getElementById('imp').click()">Restore</button></div>
+    <input type="file" id="imp" accept=".json" style="display:none" onchange="importData(this)">
+    <button class="sm danger" style="margin-top:14px" onclick="if(confirm('Erase ALL data on this phone?')){localStorage.removeItem(KEY);location.reload()}">Erase all data</button></div>
+  <button style="width:100%" onclick="saveSettings()">Save Settings</button>
+</section>
+</main>
+
+<nav id="nav">
+  <button data-v="today" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3c3 4 5 6 5 10a5 5 0 0 1-10 0c0-4 2-6 5-10z"/></svg>Fuel</button>
+  <button data-v="train"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l5-6 4 4 4-7 5 9"/></svg>Train</button>
+  <button id="addBtn" style="color:var(--gold)" onclick="openFood()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M12 7v10M7 12h10"/></svg>Log</button>
+  <button data-v="race"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20l7-12 4 6 3-4 6 10z"/><path d="M9 8V3l4 2-4 2"/></svg>Race</button>
+  <button data-v="health"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-8-5-8-11a4.5 4.5 0 0 1 8-3 4.5 4.5 0 0 1 8 3c0 6-8 11-8 11z"/></svg>Health</button>
+  <button data-v="set"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></svg>Setup</button>
+</nav>
+
+<!-- FOOD SHEET -->
+<div class="sheet" id="foodSheet" onclick="if(event.target===this)closeSheet('foodSheet')"><div>
+  <div class="row between"><h3 style="margin:0">Log Food</h3><button class="sm ghost" onclick="closeSheet('foodSheet')">Done</button></div>
+  <label>Meal</label><div class="seg" id="mealSeg"><button data-m="Breakfast">Breakfast</button><button data-m="Lunch">Lunch</button><button data-m="Dinner">Dinner</button><button data-m="Snacks">Snacks</button></div>
+  <div class="row" style="margin-top:10px"><button style="flex:1" onclick="startScan()">▦ Scan barcode</button></div>
+  <div id="reader" style="margin-top:10px"></div>
+  <label>Search foods</label><div class="row"><input id="q" placeholder="e.g. greek yogurt" onkeydown="if(event.key==='Enter')searchFood()"><button class="sm" onclick="searchFood()">Go</button></div>
+  <div class="list" id="results"></div>
+  <h4 class="mute" style="margin:14px 0 4px">Favorites & recent</h4><div class="list" id="recent"></div>
+  <h4 class="mute" style="margin:14px 0 4px">Quick add</h4>
+  <input id="qa_name" placeholder="Name"><div class="grid2" style="margin-top:6px"><input id="qa_k" type="number" placeholder="kcal"><input id="qa_p" type="number" placeholder="Protein g"><input id="qa_c" type="number" placeholder="Carbs g"><input id="qa_f" type="number" placeholder="Fat g"></div>
+  <button style="width:100%;margin-top:8px" onclick="quickAdd()">Add</button>
+</div></div>
+
+<!-- SERVING SHEET -->
+<div class="sheet" id="servSheet" onclick="if(event.target===this)closeSheet('servSheet')"><div id="servBody"></div></div>
+
+<!-- OTF EMAIL -->
+<div class="sheet" id="otfSheet" onclick="if(event.target===this)closeSheet('otfSheet')"><div>
+  <h3 style="margin-top:0">Paste OTF summary email</h3>
+  <div class="small mute">Copy the email text from Mail and paste it here. It's matched to that day's Strava workout and used to calibrate splat estimates.</div>
+  <label>Class date</label><input id="otf_date" type="date">
+  <textarea id="otf_txt" rows="8" placeholder="Paste email text…"></textarea>
+  <div class="grid3"><div><label>Splats</label><input id="otf_s" type="number"></div><div><label>Calories</label><input id="otf_k" type="number"></div><div><label>Avg HR</label><input id="otf_h" type="number"></div></div>
+  <div class="row" style="margin-top:10px"><button class="ghost" onclick="parseOtf()">Read email</button><button style="flex:1" onclick="saveOtf()">Save</button></div>
+</div></div>
+
+<!-- BODY COMP -->
+<div class="sheet" id="bcSheet" onclick="if(event.target===this)closeSheet('bcSheet')"><div>
+  <h3 style="margin-top:0">OTF Body Comp</h3>
+  <div class="small mute">Pick both screenshots (summary + segmental). Values are read on-device; check them before saving.</div>
+  <input type="file" accept="image/*" multiple onchange="ocrBC(this.files)" style="margin-top:8px">
+  <div id="bcStatus" class="small mute"></div>
+  <div class="grid2"><div><label>Date</label><input id="bc_date" type="date"></div><div><label>Body fat %</label><input id="bc_bf" type="number" step="0.1"></div>
+  <div><label>Weight lb</label><input id="bc_wt" type="number" step="0.1"></div><div><label>Skeletal muscle lb</label><input id="bc_smm" type="number" step="0.1"></div>
+  <div><label>Body fat mass lb</label><input id="bc_bfm" type="number" step="0.1"></div><div><label>Metabolic rate kcal</label><input id="bc_bmr" type="number" step="0.1"></div></div>
+  <label>Segmental lean (lb): trunk / L arm / R arm / L leg / R leg</label>
+  <div class="grid3"><input id="bc_tr" type="number" step="0.1" placeholder="Trunk"><input id="bc_la" type="number" step="0.1" placeholder="L arm"><input id="bc_ra" type="number" step="0.1" placeholder="R arm"><input id="bc_ll" type="number" step="0.1" placeholder="L leg"><input id="bc_rl" type="number" step="0.1" placeholder="R leg"></div>
+  <button style="width:100%;margin-top:12px" onclick="saveBC()">Save scan</button>
+</div></div>
+
+<!-- BP -->
+<div class="sheet" id="bpSheet" onclick="if(event.target===this)closeSheet('bpSheet')"><div>
+  <h3 style="margin-top:0">Blood Pressure</h3>
+  <div class="grid3"><div><label>Systolic</label><input id="bp_s" type="number"></div><div><label>Diastolic</label><input id="bp_d" type="number"></div><div><label>Pulse</label><input id="bp_p" type="number"></div></div>
+  <label>Date</label><input id="bp_date" type="date"><button style="width:100%;margin-top:12px" onclick="saveBP()">Save</button>
+</div></div>
+
+<!-- LABS -->
+<div class="sheet" id="labSheet" onclick="if(event.target===this)closeSheet('labSheet')"><div>
+  <h3 style="margin-top:0">Add Lab Results</h3>
+  <div class="small mute">Paste lab text from your patient portal, or pick a screenshot/photo of the report. Every result found is listed for review.</div>
+  <label>Lab date</label><input id="lab_date" type="date">
+  <input type="file" accept="image/*" onchange="ocrLabs(this.files[0])" style="margin-top:8px"><div id="labStatus" class="small mute"></div>
+  <textarea id="lab_txt" rows="6" placeholder="Paste lab report text…"></textarea>
+  <button class="ghost" style="width:100%;margin-top:6px" onclick="parseLabs(document.getElementById('lab_txt').value)">Find results</button>
+  <table id="labTbl" style="margin-top:10px"></table>
+  <button class="sm ghost" style="margin-top:6px" onclick="addLabRow()">+ Row</button>
+  <button style="width:100%;margin-top:12px" onclick="saveLabs()">Save results</button>
+</div></div>
+
+<!-- RACE EDIT -->
+<div class="sheet" id="raceSheet" onclick="if(event.target===this)closeSheet('raceSheet')"><div id="raceBody"></div></div>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
