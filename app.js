@@ -12,7 +12,7 @@ const pace = sPerMi => hms(sPerMi)+'/mi';
 const M2MI = 1/1609.344, M2FT = 3.28084;
 const r0 = n => Math.round(n||0);
 const avg = a => a.length ? a.reduce((x,y)=>x+y,0)/a.length : null;
-function toast(t){ const e=$('toast'); e.textContent=t; e.style.display='block'; clearTimeout(toast.t); toast.t=setTimeout(()=>e.style.display='none',2400); }
+function toast(t){ const e=$('toast'); e.textContent=t; e.style.display='block'; clearTimeout(toast.t); toast.t=setTimeout(()=>e.style.display='none',2600); }
 
 /* ---------- STATE ---------- */
 const DEFAULT = {
@@ -63,7 +63,7 @@ document.querySelectorAll('nav button[data-v]').forEach(b=>b.onclick=()=>go(b.da
 function go(v){ document.querySelectorAll('.view').forEach(x=>x.classList.toggle('on',x.id==='v-'+v));
   document.querySelectorAll('nav button[data-v]').forEach(x=>x.classList.toggle('on',x.dataset.v===v));
   $('hdrTitle').textContent=TITLES[v][0]; $('hdrSub').textContent=TITLES[v][1]; render(); scrollTo(0,0); }
-function openSheet(id){ $(id).classList.add('on'); const d=today(); ['otf_date','bc_date','bp_date','lab_date','sl_date'].forEach(x=>{if($(x)&&!$(x).value)$(x).value=d;}); }
+function openSheet(id){ $(id).classList.add('on'); const d=today(); ['otf_date','bc_date','bp_date','lab_date'].forEach(x=>{if($(x)&&!$(x).value)$(x).value=d;}); }
 function closeSheet(id){ $(id).classList.remove('on'); if(id==='foodSheet') stopScan(); }
 function setSeg(id,attr,val){ document.querySelectorAll('#'+id+' button').forEach(b=>b.classList.toggle('on',b.dataset[attr]===val)); }
 
@@ -111,10 +111,12 @@ function renderToday(){
     return `<div style="margin-bottom:10px"><div class="row between"><b>${m}</b><span class="small mute">${r0(mk)} kcal <button class="sm ghost" onclick="meal='${m}';openFood()">+</button></span></div>
     ${items.map(([x,i])=>`<div class="row between small" style="padding:4px 0"><span>${esc(x.name)} <span class="mute">×${+x.q.toFixed(2)}</span></span><span>${r0(x.k*x.q)} <button class="sm ghost" onclick="delFood(${i})">✕</button></span></div>`).join('')}</div>`; }).join('');
   const ls=S.sleep.find(x=>x.date===today());
-  $('sleepPrompt').innerHTML=(day===today()&&!ls)?`<div class="card" style="border-color:var(--violet)"><div class="row between"><span>🌙 How did you sleep last night?</span><button class="sm" style="background:var(--violet)" onclick="openSleep()">Log</button></div></div>`:'';
+  $('sleepPrompt').innerHTML=day!==today()?'':ls
+    ?`<div class="card"><div class="row between"><span>🌙 Last night: <b>${ls.hrs} h</b> · restful <b>${ls.rest}/10</b></span><button class="sm ghost" onclick="openSleep('${ls.date}')">Edit</button></div></div>`
+    :`<div class="card" style="border-color:var(--violet)"><div class="row between"><span>🌙 How did you sleep last night?</span><button class="sm" style="background:var(--violet)" onclick="openSleep()">Log</button></div></div>`;
   const lastBp=S.bp[S.bp.length-1];
   $('bpPrompt').innerHTML=(!lastBp||daysBetween(lastBp.date,today())>=30)?`<div class="card" style="border-color:var(--gold)"><div class="row between"><span>🩺 Monthly blood pressure check is due</span><button class="sm" onclick="openSheet('bpSheet')">Log</button></div></div>`:'';
-  renderCoachCard();
+  if(typeof renderCoachCard==='function') renderCoachCard();
 }
 function delFood(i){ dayFood(day).splice(i,1); save(); render(); }
 function copyYesterday(){ const y=S.food[addDays(day,-1)]||[]; if(!y.length) return toast('Nothing logged yesterday'); y.forEach(x=>dayFood(day).push({...x})); save(); render(); toast('Copied '+y.length+' items'); }
@@ -150,8 +152,8 @@ async function searchFood(){
 function servingSheet(f){
   window._sf=f; const isFav=S.favorites.some(x=>x.name===f.name);
   $('servBody').innerHTML=`<h3 style="margin-top:0">${esc(f.name)}</h3><div class="small mute">Per ${esc(f.serv)}: ${r0(f.k)} kcal · P${r0(f.p)} C${r0(f.c)} F${r0(f.f)}</div>
-   <label>Number of servings${f.serv==='100 g'?' (×100 g)':''}</label><input id="sv_q" type="number" step="0.25" value="1">
-   <div class="row" style="margin-top:12px"><button class="ghost" onclick="toggleFav()">${isFav?'★ Unfavorite':'☆ Favorite'}</button><button style="flex:1" onclick="logFood(_sf,+$('sv_q').value||1);closeSheet('servSheet')">Add to ${meal}</button></div>`;
+   <label>Number of servings${f.serv==='100 g'?' (×100 g)':''}</label><input id="sv_q" type="text" inputmode="decimal" value="1">
+   <div class="row" style="margin-top:12px"><button class="ghost" onclick="toggleFav()">${isFav?'★ Unfavorite':'☆ Favorite'}</button><button style="flex:1" onclick="logFood(_sf,parseFloat($('sv_q').value)||1);closeSheet('servSheet')">Add to ${meal}</button></div>`;
   openSheet('servSheet');
 }
 function toggleFav(){ const f=_sf, i=S.favorites.findIndex(x=>x.name===f.name); i>=0?S.favorites.splice(i,1):S.favorites.push(f); save(); servingSheet(f); renderRecent(); }
@@ -172,31 +174,32 @@ async function lookupBarcode(code){
   try{ const j=await (await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=product_name,brands,nutriments,serving_size,code`)).json();
     if(j.status===1&&j.product&&j.product.nutriments&&(j.product.nutriments['energy-kcal_serving']!=null||j.product.nutriments['energy-kcal_100g']!=null)) return servingSheet(offToFood(j.product));
   }catch(e){}
-  pendingCode=code; openLabel(j=>0); $('lbStatus').innerHTML=`Barcode <b>${esc(code)}</b> isn't in the database. Snap the label once and it'll be remembered next time you scan it.`;
+  openLabel(code); $('lbStatus').innerHTML=`Barcode <b>${esc(code)}</b> isn't in the database. Snap the label once and it'll be remembered next time you scan it.`;
 }
 
 /* Nutrition-label scanner (on-device OCR) */
-function openLabel(){ ['lb_name','lb_serv','lb_k','lb_p','lb_c','lb_f','lb_fi','lb_su','lb_na'].forEach(x=>$(x).value=''); $('lb_q').value=1;
-  $('lb_img').style.display='none'; $('lbStatus').textContent=''; $('lbCheck').textContent=''; if(!arguments.length) pendingCode=null; openSheet('labelSheet'); }
+function openLabel(code){ ['lb_name','lb_serv','lb_k','lb_p','lb_c','lb_f','lb_fi','lb_su','lb_na'].forEach(x=>$(x).value=''); $('lb_q').value=1;
+  $('lb_img').style.display='none'; $('lbStatus').textContent=''; $('lbCheck').textContent=''; pendingCode=typeof code==='string'?code:null; openSheet('labelSheet'); }
 let tesseractLoading=null;
-function loadTesseract(){ return tesseractLoading||(tesseractLoading=new Promise((res,rej)=>{ if(window.Tesseract)return res(); const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'; s.onload=res; s.onerror=()=>{tesseractLoading=null;rej();}; document.head.appendChild(s); })); }
-function prepImage(file,maxW=1600){ // downscale + grayscale + contrast for better OCR on phone photos
-  return new Promise((res,rej)=>{ const img=new Image(); img.onload=()=>{ const sc=Math.min(1,maxW/img.width), c=document.createElement('canvas');
-    c.width=img.width*sc; c.height=img.height*sc; const x=c.getContext('2d'); x.drawImage(img,0,0,c.width,c.height);
-    const d=x.getImageData(0,0,c.width,c.height), p=d.data;
-    for(let i=0;i<p.length;i+=4){ let g=.299*p[i]+.587*p[i+1]+.114*p[i+2]; g=Math.max(0,Math.min(255,(g-128)*1.6+128)); p[i]=p[i+1]=p[i+2]=g; }
-    x.putImageData(d,0,0); res(c); }; img.onerror=rej; img.src=URL.createObjectURL(file); });
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
+function loadTesseract(){ return tesseractLoading||(tesseractLoading=(window.Tesseract?Promise.resolve():loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js')).catch(e=>{tesseractLoading=null;throw e;})); }
+function prepCanvas(src,maxW=1800){ // grayscale + contrast for better OCR
+  const sc=Math.min(1,maxW/src.width), c=document.createElement('canvas'); c.width=src.width*sc; c.height=src.height*sc;
+  const x=c.getContext('2d'); x.drawImage(src,0,0,c.width,c.height); const d=x.getImageData(0,0,c.width,c.height), p=d.data;
+  for(let i=0;i<p.length;i+=4){ let g=.299*p[i]+.587*p[i+1]+.114*p[i+2]; g=Math.max(0,Math.min(255,(g-128)*1.6+128)); p[i]=p[i+1]=p[i+2]=g; }
+  x.putImageData(d,0,0); return c;
 }
-async function ocr(file,status){ $(status).textContent='Reading image on your phone… (first time downloads the reader)'; await loadTesseract();
-  const c=await prepImage(file); const r=await Tesseract.recognize(c,'eng'); $(status).textContent=''; return r.data.text; }
+function fileToImage(file){ return new Promise((res,rej)=>{ const img=new Image(); img.onload=()=>res(img); img.onerror=rej; img.src=URL.createObjectURL(file); }); }
+async function ocrSource(src,status){ $(status).textContent='Reading on your phone… (first time downloads the reader)'; await loadTesseract();
+  const r=await Tesseract.recognize(prepCanvas(src),'eng'); return r.data.text; }
+async function ocr(file,status){ const t=await ocrSource(await fileToImage(file),status); $(status).textContent=''; return t; }
 function parseLabelText(raw){
   let t=raw.replace(/[|]/g,' ').replace(/(\d),(\d{3})/g,'$1$2');
-  for(let i=0;i<3;i++) t=t.replace(/(\d)[Oo]/g,'$10');            // OCR: 1O -> 10, 2OO -> 200
-  t=t.replace(/\b[Oo](\s*m?g)\b/g,'0$1').replace(/(\d)\s*[q9](?=\s|$)/gm,'$1g'); // O g -> 0g, 8q -> 8g
+  for(let i=0;i<3;i++) t=t.replace(/(\d)[Oo]/g,'$10');
+  t=t.replace(/\b[Oo](\s*m?g)\b/g,'0$1').replace(/(\d)\s*[q9](?=\s|$)/gm,'$1g');
   const num=re=>{ const m=t.match(re); return m?parseFloat(m[1]):null; };
-  const kcal=num(/calories(?!\s*from)[^\d\n]{0,12}\n?\s*(\d{1,4})/i);
   return { serv:(t.match(/serving\s*size\s*[:\-]?\s*([^\n]{1,40})/i)||[])[1]?.trim()||'',
-    k:kcal, f:num(/total\s*fat\s*(\d+(?:\.\d+)?)\s*g/i), c:num(/total\s*carb\w*\.?\s*(\d+(?:\.\d+)?)\s*g/i),
+    k:num(/calories(?!\s*from)[^\d\n]{0,12}\n?\s*(\d{1,4})/i), f:num(/total\s*fat\s*(\d+(?:\.\d+)?)\s*g/i), c:num(/total\s*carb\w*\.?\s*(\d+(?:\.\d+)?)\s*g/i),
     p:num(/protein\s*(\d+(?:\.\d+)?)\s*g/i), fi:num(/(?:dietary\s*)?fiber\s*(\d+(?:\.\d+)?)\s*g/i),
     su:num(/total\s*sugars?\s*(\d+(?:\.\d+)?)\s*g/i)??num(/sugars?\s*(\d+(?:\.\d+)?)\s*g/i), na:num(/sodium\s*(\d+(?:\.\d+)?)\s*mg/i) };
 }
@@ -212,33 +215,47 @@ async function ocrLabel(file){
 function labelCheck(){ const k=+$('lb_k').value, est=(+$('lb_p').value)*4+(+$('lb_c').value)*4+(+$('lb_f').value)*9;
   if(!k||!est){ $('lbCheck').textContent=''; return; } const off=Math.abs(est-k)/k;
   $('lbCheck').innerHTML=off>.2?`<span class="flag">⚠ Macros add up to ~${r0(est)} kcal but label says ${k}. One number may be misread.</span>`:`<span style="color:var(--green)">✓ Macros add up (~${r0(est)} kcal)</span>`; }
-['lb_k','lb_p','lb_c','lb_f'].forEach(id=>document.addEventListener('input',e=>{ if(e.target.id===id) labelCheck(); }));
+document.addEventListener('input',e=>{ if(['lb_k','lb_p','lb_c','lb_f'].includes(e.target.id)) labelCheck(); });
 function saveLabel(){
   const f={name:$('lb_name').value.trim()||'Scanned food',serv:$('lb_serv').value.trim()||'1 serving',k:+$('lb_k').value||0,p:+$('lb_p').value||0,c:+$('lb_c').value||0,f:+$('lb_f').value||0,
     fi:+$('lb_fi').value||0,su:+$('lb_su').value||0,na:+$('lb_na').value||0,custom:true,code:pendingCode||null};
   if(!f.k&&!f.p&&!f.c&&!f.f) return toast('Enter at least calories');
   S.myFoods=[f,...S.myFoods.filter(x=>x.name!==f.name&&(!f.code||x.code!==f.code))]; pendingCode=null;
-  logFood(f,+$('lb_q').value||1); closeSheet('labelSheet');
+  logFood(f,parseFloat($('lb_q').value)||1); closeSheet('labelSheet');
 }
 
 /* ---------- SLEEP ---------- */
-function openSleep(){ const d=today(), e=S.sleep.find(x=>x.date===d); $('sl_date').value=d; $('sl_h').value=e?e.hrs:''; $('sl_r').value=e?e.rest:7; $('sl_rv').textContent=$('sl_r').value; openSheet('sleepSheet'); }
-function saveSleep(){ const d=$('sl_date').value||today(), h=+$('sl_h').value; if(!h||h>16) return toast('Enter hours slept');
-  S.sleep=S.sleep.filter(x=>x.date!==d); S.sleep.push({date:d,hrs:h,rest:+$('sl_r').value}); S.sleep.sort((a,b)=>a.date.localeCompare(b.date));
+let slRest=null;
+function parseHours(v){ v=String(v||'').trim().replace(',','.'); if(!v) return null;
+  let m=v.match(/^(\d{1,2})\s*[:h]\s*(\d{1,2})\s*m?$/i); if(m) return +m[1]+ +m[2]/60;   // 7:30, 7h30
+  m=v.match(/^(\d{1,2}(?:\.\d+)?)\s*h?$/i); return m?+m[1]:null; }
+function stepSleep(d){ const cur=parseHours($('sl_h').value)??S.settings.sleepGoal; $('sl_h').value=Math.max(0,Math.min(16,Math.round((cur+d)*4)/4)); }
+function normSleep(){ const h=parseHours($('sl_h').value); if(h!=null) $('sl_h').value=Math.round(h*4)/4; }
+function setRest(n){ slRest=n; $('sl_rv').textContent=n; document.querySelectorAll('#sl_rate button').forEach(b=>b.classList.toggle('on',+b.dataset.r===n)); }
+function loadSleepFor(d){ const e=S.sleep.find(x=>x.date===d); $('sl_h').value=e?e.hrs:''; setRest(e?e.rest:null); if(!e) $('sl_rv').textContent='–'; $('sl_del').style.display=e?'block':'none'; }
+function openSleep(d){
+  if(!$('sl_rate').children.length) $('sl_rate').innerHTML=[...Array(10)].map((_,i)=>`<button type="button" data-r="${i+1}" onclick="setRest(${i+1})">${i+1}</button>`).join('');
+  d=typeof d==='string'?d:today(); $('sl_date').value=d; loadSleepFor(d); openSheet('sleepSheet'); }
+function saveSleep(){ const d=$('sl_date').value||today(), h=parseHours($('sl_h').value);
+  if(h==null||h<=0||h>16) return toast('Enter hours slept (e.g. 7.5 or 7:30)');
+  if(!slRest) return toast('Tap a restfulness number 1–10');
+  S.sleep=S.sleep.filter(x=>x.date!==d); S.sleep.push({date:d,hrs:Math.round(h*100)/100,rest:slRest}); S.sleep.sort((a,b)=>a.date.localeCompare(b.date));
   save(); closeSheet('sleepSheet'); render(); toast(h>=S.settings.sleepGoal?'Well rested 🌙':'Logged – go easy if you feel it'); }
+function deleteSleep(){ const d=$('sl_date').value; if(!confirm('Delete sleep for '+fmtDate(d)+'?')) return; S.sleep=S.sleep.filter(x=>x.date!==d); save(); closeSheet('sleepSheet'); render(); }
 function sleepWindow(n){ const c=addDays(today(),-n); return S.sleep.filter(x=>x.date>c); }
 function renderSleep(){
   const w=sleepWindow(7), w30=sleepWindow(30), g=S.settings.sleepGoal;
   if(!S.sleep.length){ $('sleep').innerHTML='<div class="mute small">Log hours + how restful you felt each morning. The coach uses it to tune training and recovery advice.</div>'; return; }
   const ah=avg(w.map(x=>x.hrs)), ar=avg(w.map(x=>x.rest)), debt=w.reduce((a,x)=>a+Math.max(0,g-x.hrs),0);
   const days=[...Array(14)].map((_,i)=>addDays(today(),i-13)), mx=Math.max(g+1.5,...S.sleep.map(x=>x.hrs));
-  const bars=days.map((d,i)=>{ const e=S.sleep.find(x=>x.date===d), h=e?e.hrs:0, H=70*h/mx, col=!e?'transparent':e.rest>=7?'var(--green)':e.rest>=4?'var(--gold)':'var(--red)';
-    return `<rect x="${i*22+3}" y="${78-H}" width="16" rx="4" height="${H}" fill="${col}" opacity=".85"/><text x="${i*22+11}" y="92" font-size="8" fill="var(--mute)" text-anchor="middle">${new Date(d+'T12:00').toLocaleDateString(undefined,{weekday:'narrow'})}</text>`; }).join('');
+  const bars=days.map((d,i)=>{ const e=S.sleep.find(x=>x.date===d), H=e?70*e.hrs/mx:0, col=!e?'transparent':e.rest>=7?'var(--green)':e.rest>=4?'var(--gold)':'var(--red)';
+    return `<g onclick="openSleep('${d}')"><rect x="${i*22}" y="0" width="22" height="96" fill="transparent"/><rect x="${i*22+3}" y="${78-H}" width="16" rx="4" height="${H}" fill="${col}" opacity=".85"/><text x="${i*22+11}" y="92" font-size="8" fill="var(--mute)" text-anchor="middle">${new Date(d+'T12:00').toLocaleDateString(undefined,{weekday:'narrow'})}</text></g>`; }).join('');
   $('sleep').innerHTML=`<div class="grid3"><div><div class="big" style="font-size:24px">${ah?ah.toFixed(1):'–'}</div><div class="small mute">avg hrs (7d)</div></div>
     <div><div class="big" style="font-size:24px">${ar?ar.toFixed(1):'–'}</div><div class="small mute">restful /10</div></div>
     <div><div class="big" style="font-size:24px;color:${debt>3?'var(--red)':'var(--ink)'}">${debt.toFixed(1)}</div><div class="small mute">hrs sleep debt</div></div></div>
     <svg viewBox="0 0 308 96" width="100%" style="margin-top:10px"><line x1="0" x2="308" y1="${78-70*g/mx}" y2="${78-70*g/mx}" stroke="var(--violet)" stroke-dasharray="3 4"/>${bars}</svg>
-    <div class="small mute">Bar color = restfulness (green 7+, gold 4–6, red ≤3). Dashed line = ${g} h goal. ${w30.length} nights logged in last 30 days.</div>`;
+    <div class="small mute">Tap any bar to edit that night. Color = restfulness (green 7+, gold 4–6, red ≤3). Dashed line = ${g} h goal.</div>
+    <div class="list" style="margin-top:8px">${S.sleep.slice(-5).reverse().map(x=>`<div class="row between small" onclick="openSleep('${x.date}')"><span>${fmtDate(x.date)}</span><b>${x.hrs} h · ${x.rest}/10</b><span class="mute">Edit ›</span></div>`).join('')}</div>`;
 }
 
 /* ---------- STRAVA ---------- */
@@ -361,7 +378,7 @@ function renderRace(){
      <div class="small mute" style="margin-top:8px">Based on ${P.src} and ${P.otfWk.toFixed(1)} OTF classes/week. Rough estimate — tightens as more data syncs.</div>
      ${g?`<div class="tip">${g<P.lo?`Your goal ${hms(g)} is a stretch — ~${r0((P.mid-g)/60)} min faster than predicted. Doable with focused run volume + compromised-run sessions.`:g>P.hi?`Your goal ${hms(g)} looks comfortable — consider aiming for ${hms(P.mid*0.97)}.`:`Your goal ${hms(g)} is right on target. 🎯`}</div>`:`<button class="sm" style="margin-top:8px" onclick="setGoalPrompt('${hy.id}',${r0(P.mid*0.97)})">Set a goal time</button>`}`;
   } else $('predict').innerHTML='<div class="mute">Connect Strava and sync to get a prediction.</div>';
-  $('plan').innerHTML=weeklyPlan().map(x=>`<div class="tip">${x}</div>`).join('')+insightsHTML(getInsights().filter(i=>i.cat==='Training'||i.cat==='Race'));
+  $('plan').innerHTML=weeklyPlan().map(x=>`<div class="tip">${x}</div>`).join('')+(typeof getInsights==='function'?insightsHTML(getInsights().filter(i=>i.cat==='Training'||i.cat==='Race')):'');
   $('races').innerHTML=S.races.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`<div class="row between" onclick="editRace('${r.id}')"><span><b>${esc(r.name)}</b><br><span class="small mute">${fmtDate(r.date)} ${r.date.slice(0,4)}${r.result?` · ${hms(r.result.time)}${r.result.dist?` · ${r.result.dist} mi`:''}${r.result.elevFt?` · ${r.result.elevFt.toLocaleString()} ft`:''}`:''}</span></span><span class="pill ${r.done?'green':''}">${r.done?'✓ Summited':'Goal'}</span></div>`).join('');
 }
 function setGoalPrompt(id,sugg){ const v=prompt('Goal time (h:mm:ss)',hms(sugg)); if(!v)return; S.races.find(r=>r.id===id).goal=v.split(':').map(Number).reduce((a,x)=>a*60+x,0); save(); render(); }
@@ -415,7 +432,7 @@ function renderTrain(){
 }
 function streak(){ let n=0,d=today(); if(!(S.food[d]||[]).length)d=addDays(d,-1); while((S.food[d]||[]).length){n++;d=addDays(d,-1);} return n; }
 
-/* ---------- HEALTH ---------- */
+/* ---------- HEALTH: BODY COMP / BP ---------- */
 async function ocrBC(files){
   let txt=''; try{ for(const f of files) txt+='\n'+await ocr(f,'bcStatus'); }catch(e){ $('bcStatus').textContent='Could not read image – enter values manually.'; return; }
   const t=txt.replace(/,(\d{3})/g,'$1'), g=re=>{const m=t.match(re);return m?m[1]:null;}, set=(id,v)=>{ if(v!=null) $(id).value=v; };
@@ -433,22 +450,128 @@ function saveBC(){ const v=id=>+$(id).value||null;
 function saveBP(){ const s=+$('bp_s').value,d=+$('bp_d').value; if(!s||!d) return toast('Enter both numbers');
   S.bp.push({date:$('bp_date').value||today(),sys:s,dia:d,pulse:+$('bp_p').value||null}); S.bp.sort((a,b)=>a.date.localeCompare(b.date)); save(); closeSheet('bpSheet'); render(); }
 function bpCat(s,d){ return s>=140||d>=90?['Stage 2','red']:s>=130||d>=80?['Stage 1','red']:s>=120?['Elevated','']:['Normal','green']; }
-let labRows=[];
-async function ocrLabs(file){ try{ const t=await ocr(file,'labStatus'); $('lab_txt').value=t; parseLabs(t);}catch(e){$('labStatus').textContent='Could not read image.';} }
-function parseLabs(t){
-  labRows=[]; const re=/^\s*([A-Za-z][A-Za-z0-9 ,'\-\(\)\/\.%]{1,40}?)[\s:]+([<>]?\s*\d+(?:\.\d+)?)\s*(?:(H|L|High|Low)\s+)?([a-zA-Zµμ%\/\^\.\d\*]{0,14})?\s*(?:(?:Ref(?:erence)?\s*(?:Range)?:?\s*)?(\d+(?:\.\d+)?\s*[-–]\s*\d+(?:\.\d+)?|[<>]\s*\d+(?:\.\d+)?))?/;
-  t.split(/\n/).forEach(line=>{ const m=line.match(re); if(m&&!/^(page|date|patient|dob|name|phone|collected|received|reported)/i.test(m[1].trim()))
-    labRows.push({name:m[1].trim(),value:m[2].replace(/\s/g,''),unit:(m[4]||'').trim(),range:(m[5]||'').replace(/\s/g,'')}); });
-  renderLabTbl(); toast(labRows.length+' results found – review below');
+
+/* ---------- HEALTH: LABS (PDF / image / text) ----------
+   PDFs are read by COLUMN POSITION: find the "TEST | RESULTS | REFERENCE | UNITS" header, then only accept rows whose
+   test name starts in the TEST column and whose RESULTS cell is a number. Indented reference-range notes, comments,
+   page headers/footers and the "Values Outside of Reference Range" summary are ignored. */
+let labRows=[], pdfMod=null;
+async function loadPdf(){ if(!pdfMod){ pdfMod=await import('./pdfjs.js'); pdfMod.GlobalWorkerOptions.workerSrc=new URL('pdfjs.worker.js',location.href).href; } return pdfMod; }
+async function pdfPages(file){
+  const lib=await loadPdf(), pdf=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise, pages=[];
+  for(let p=1;p<=pdf.numPages;p++){
+    $('labStatus').textContent=`Reading page ${p} of ${pdf.numPages}…`;
+    const tc=await (await pdf.getPage(p)).getTextContent();
+    const items=tc.items.filter(i=>i.str&&i.str.trim()).map(i=>({x:i.transform[4],y:i.transform[5],w:i.width||0,s:i.str.replace(/\s+/g,' ').trim()}))
+      .sort((a,b)=>b.y-a.y||a.x-b.x);
+    const lines=[]; items.forEach(it=>{ const L=lines[lines.length-1]; if(L&&Math.abs(L.y-it.y)<=2.5) L.items.push(it); else lines.push({y:it.y,items:[it]}); });
+    lines.forEach(L=>{ L.items.sort((a,b)=>a.x-b.x); L.text=L.items.map(i=>i.s).join(' '); });
+    pages.push(lines);
+  }
+  return {pages,pdf};
 }
-function addLabRow(){ labRows.push({name:'',value:'',unit:'',range:''}); renderLabTbl(); }
-function renderLabTbl(){ $('labTbl').innerHTML='<tr><th>Test</th><th>Value</th><th>Unit</th><th>Range</th><th></th></tr>'+labRows.map((r,i)=>
-  `<tr>${['name','value','unit','range'].map(k=>`<td><input style="padding:5px;font-size:14px" value="${esc(r[k])}" onchange="labRows[${i}].${k}=this.value"></td>`).join('')}<td><button class="sm ghost" onclick="labRows.splice(${i},1);renderLabTbl()">✕</button></td></tr>`).join(''); }
-function saveLabs(){ const d=$('lab_date').value||today(); labRows.filter(r=>r.name&&r.value).forEach(r=>S.labs.push({date:d,...r})); labRows=[]; renderLabTbl(); $('lab_txt').value=''; save(); closeSheet('labSheet'); render(); toast('Labs saved'); }
-function outOfRange(r){ const v=parseFloat(String(r.value).replace(/[<>]/,'')), m=String(r.range).match(/([\d.]+)[-–]([\d.]+)/); if(m) return v<+m[1]?'low':v>+m[2]?'high':false;
-  const lt=String(r.range).match(/<([\d.]+)/); if(lt) return v>=+lt[1]?'high':false; const gt=String(r.range).match(/>([\d.]+)/); if(gt) return v<=+gt[1]?'low':false; return false; }
+function findCols(line){
+  const g=re=>line.items.find(i=>re.test(i.s.toUpperCase()));
+  const test=g(/^(TEST|TESTS|TEST NAME|COMPONENT|ANALYTE)\b/), res=g(/^(RESULTS?|YOUR VALUE|VALUE)\b/), ref=g(/^(REF|REFERENCE|NORMAL|STANDARD RANGE|RANGE)/), un=g(/^UNITS?\b/), pl=g(/^(PL|LAB|SITE)$/);
+  if(!test||!res||!(ref||un)) return null;
+  const resL=res.x-Math.min(45,(res.x-test.x)*0.25);
+  const resR=ref?(res.x+res.w+ref.x)/2:un.x-4;
+  const refR=ref&&un?(ref.x+ref.w+un.x)/2:Infinity;
+  const unR=pl?pl.x-4:Infinity;
+  return {testX:test.x,resL,resR,refR,unR};
+}
+const LAB_JUNK=/^(account|id\/?mr|patient|order|collected|received|reported|route|report status|page|dob|age|sex|fasting|distribution|tests ordered|values (outside|listed)|end of report|unless otherwise|testing (noted|performed)|parent site|l=low|this test|reference|no reference)/i;
+const REF_LABEL=/^(follicular|ovulation|luteal|midcycle|post-?menopausal|pregnan|first trimester|second trimester|third trimester|adult|male|female|non-pregnant|severe|mild|optimum|collection time)/i;
+const RES_RE=/^([<>≤≥]=?\s*)?(\d+(?:\.\d+)?)\s*\*?\s*(CH|CL|H|L|C|A|HIGH|LOW)?\b\s*\*?/i;
+function cleanRange(s){ return String(s||'').replace(/\s+/g,'').replace(/<=/g,'≤').replace(/>=/g,'≥').replace(/–/g,'-'); }
+function parsePdfLabs(pages){
+  const rows=[], seen=new Set(); let cols=null, panel='', inSummary=false;
+  pages.forEach(lines=>{
+   const hdr=lines.filter(L=>/(collected|reported|received|patient phone|dob)\s*:/i.test(L.text)), cut=hdr.length?Math.min(...hdr.map(L=>L.y)):Infinity;
+   lines.forEach(L=>{
+    if(L.y>=cut-1&&!findCols(L)) return;                                  // repeated page header block
+    const c=findCols(L); if(c){ cols=c; return; }
+    if(/values outside of reference range/i.test(L.text)){ inSummary=true; return; }
+    if(!cols||inSummary) return;
+    const cell={name:[],res:[],ref:[],unit:[]};
+    L.items.forEach(it=>{ const cx=it.x+it.w/2;
+      if(it.x<cols.resL) cell.name.push(it); else if(cx<cols.resR) cell.res.push(it); else if(cx<cols.refR) cell.ref.push(it); else if(cx<cols.unR) cell.unit.push(it); });
+    if(!cell.name.length) return;
+    const nameX=cell.name[0].x, name=cell.name.map(i=>i.s).join(' ').trim(), res=cell.res.map(i=>i.s).join(' ').trim();
+    if(nameX>cols.testX+28) return;                                    // indented = reference-range notes / comments
+    if(/^[*(]/.test(name)||name.includes(':')||LAB_JUNK.test(name)||REF_LABEL.test(name)) return;
+    if(!res){ if(!cell.ref.length&&!cell.unit.length&&name.length<60&&!/[;.]$/.test(name)) panel=name; return; } // section heading
+    const m=res.match(RES_RE); if(!m) return;                          // "None", "Adequate", "See Comment"
+    const key=name.toLowerCase(); if(seen.has(key)) return; seen.add(key);
+    const fl=(m[3]||'').toUpperCase(), flag=/^(H|HIGH|CH)$/.test(fl)?'H':/^(L|LOW|CL)$/.test(fl)?'L':'';
+    rows.push({name,value:(m[1]?m[1].replace(/\s/g,''):'')+m[2],flag,unit:cell.unit.map(i=>i.s).join(' ').trim(),range:cleanRange(cell.ref.map(i=>i.s).join(' ')),panel});
+  });});
+  return rows;
+}
+/* Fallback for photos / pasted text: strict one-line pattern */
+function parseTextLabs(t){
+  const rows=[], seen=new Set(); let panel='';
+  const re=/^\s*([A-Za-z][A-Za-z0-9 ,'\-\(\)\/\.]{1,50}?)\s{1,}([<>≤≥]?\d+(?:\.\d+)?)\s*\*?\s*(H|L|CH|CL|High|Low)?\s*\*?\s+(?:((?:[<>≤≥]=?\s*)?\d+(?:\.\d+)?(?:\s*[-–]\s*\d+(?:\.\d+)?)?)\s*)?([a-zA-Zµμ%\/][a-zA-Zµμ%\/\.\d\^]{0,14})?(?:\s+[A-Z]{2})?\s*$/;
+  String(t).split(/\n/).forEach(raw=>{
+    const line=raw.replace(/\s+/g,' ').trim(); if(!line||/^[*(]/.test(line)||LAB_JUNK.test(line)) return;
+    const m=line.match(re); if(!m){ if(line.length<50&&!/\d/.test(line)&&!line.includes(':')) panel=line; return; }
+    const name=m[1].trim(); if(name.includes(':')||!(m[4]||m[5])||/[-–]\s*$/.test(name)||/\d\s*[-–]/.test(name)||REF_LABEL.test(name)) return;
+    const key=name.toLowerCase(); if(seen.has(key)) return; seen.add(key);
+    const fl=(m[3]||'').toUpperCase();
+    rows.push({name,value:m[2],flag:/^(H|HIGH|CH)$/.test(fl)?'H':/^(L|LOW|CL)$/.test(fl)?'L':'',unit:m[5]||'',range:cleanRange(m[4]),panel});
+  });
+  return rows;
+}
+async function handleLabFile(file){
+  if(!file) return; const name=(file.name||'').toLowerCase(), type=file.type||''; let rows=[], text='';
+  try{
+    if(type==='application/pdf'||name.endsWith('.pdf')){
+      $('labStatus').textContent='Opening PDF…';
+      const {pages,pdf}=await pdfPages(file); text=pages.map(p=>p.map(l=>l.text).join('\n')).join('\n');
+      rows=parsePdfLabs(pages);
+      if(rows.length<5&&text.replace(/\s/g,'').length>40) rows=parseTextLabs(text);
+      if(text.replace(/\s/g,'').length<40){ $('labStatus').textContent='Scanned PDF – reading with OCR (~30 sec)…'; text=await pdfOcr(pdf); rows=parseTextLabs(text); }
+    } else if(type.startsWith('text')||name.endsWith('.txt')){ text=await file.text(); rows=parseTextLabs(text); }
+    else { text=await ocr(file,'labStatus'); rows=parseTextLabs(text); }
+  }catch(e){ console.error(e); $('labStatus').textContent='Could not read that file ('+(e.message||'error')+'). Try a screenshot, or paste the text.'; return; }
+  const dm=text.match(/collect\w*\s*(?:date)?[:\s]*([01]?\d\/[0-3]?\d\/(?:20)?\d{2})/i)||text.match(/([01]?\d\/[0-3]?\d\/20\d{2})/);
+  if(dm){ const d=new Date(dm[1]); if(!isNaN(d)) $('lab_date').value=iso(d); }
+  labRows=rows; renderLabTbl();
+  const n=rows.length, ab=rows.filter(r=>outOfRange(r)).length;
+  $('labStatus').innerHTML=n?`✓ Found <b>${n} results</b>${ab?`, <span class="flag">${ab} outside range</span>`:''}. Collected ${$('lab_date').value?fmtDate($('lab_date').value)+' '+$('lab_date').value.slice(0,4):'?'} — check the date, then Save.`
+    :'No results recognized. Paste the text below or add rows with + Row.';
+}
+async function pdfOcr(pdf){ let out='';
+  for(let p=1;p<=Math.min(pdf.numPages,6);p++){
+    const page=await pdf.getPage(p), vp=page.getViewport({scale:2}), c=document.createElement('canvas'); c.width=vp.width; c.height=vp.height;
+    await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise; out+='\n'+await ocrSource(c,'labStatus'); }
+  return out; }
+function parseLabs(t){ labRows=parseTextLabs(t); renderLabTbl(); toast(labRows.length?labRows.length+' results found – review below':'No results found in that text'); }
+function addLabRow(){ labRows.push({name:'',value:'',flag:'',unit:'',range:'',panel:''}); renderLabTbl(); }
+function renderLabTbl(){
+  let lastPanel=null, html='<tr><th>Test</th><th>Value</th><th>Range</th><th></th></tr>';
+  labRows.forEach((r,i)=>{ if(r.panel&&r.panel!==lastPanel){ lastPanel=r.panel; html+=`<tr><td colspan="4" class="small" style="color:var(--gold);padding-top:10px">${esc(r.panel)}</td></tr>`; }
+    const o=r.value&&outOfRange(r);
+    html+=`<tr><td><input style="padding:5px;font-size:14px" value="${esc(r.name)}" onchange="labRows[${i}].name=this.value"></td>
+      <td><input style="padding:5px;font-size:14px;width:70px;${o?'color:var(--red);font-weight:700':''}" value="${esc(r.value)}" onchange="labRows[${i}].value=this.value"><div class="small mute">${esc(r.unit)}${r.flag?` <span class="flag">${r.flag}</span>`:''}</div></td>
+      <td><input style="padding:5px;font-size:14px;width:84px" value="${esc(r.range)}" onchange="labRows[${i}].range=this.value"></td>
+      <td><button class="sm ghost" onclick="labRows.splice(${i},1);renderLabTbl()">✕</button></td></tr>`; });
+  $('labTbl').innerHTML=labRows.length?html:''; }
+function saveLabs(){ const d=$('lab_date').value||today(), rows=labRows.filter(r=>r.name&&r.value); if(!rows.length) return toast('No results to save');
+  S.labs=S.labs.filter(x=>!(x.date===d&&rows.some(r=>r.name.toLowerCase()===x.name.toLowerCase())));
+  rows.forEach(r=>S.labs.push({date:d,...r})); labRows=[]; renderLabTbl(); $('lab_txt').value=''; $('labStatus').textContent=''; save(); closeSheet('labSheet'); render(); toast(rows.length+' lab results saved'); }
+function outOfRange(r){
+  if(r.flag==='H') return 'high'; if(r.flag==='L') return 'low';
+  const v=parseFloat(String(r.value).replace(/[<>≤≥=]/g,'')), R=cleanRange(r.range); if(isNaN(v)||!R) return false;
+  let m=R.match(/^(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)$/); if(m) return v<+m[1]?'low':v>+m[2]?'high':false;
+  m=R.match(/^≤(\d+(?:\.\d+)?)/); if(m) return v>+m[1]?'high':false;
+  m=R.match(/^<(\d+(?:\.\d+)?)/); if(m) return v>=+m[1]?'high':false;
+  m=R.match(/^≥(\d+(?:\.\d+)?)/); if(m) return v<+m[1]?'low':false;
+  m=R.match(/^>(\d+(?:\.\d+)?)/); if(m) return v<=+m[1]?'low':false;
+  return false; }
 function miniSpark(vals,color){ if(vals.length<2) return ''; const mx=Math.max(...vals),mn=Math.min(...vals),W=80,H=24;
   return `<svg width="${W}" height="${H}"><polyline fill="none" stroke="${color}" stroke-width="2" points="${vals.map((v,i)=>`${i/(vals.length-1)*W},${H-2-(mx===mn?.5:(v-mn)/(mx-mn))*(H-4)}`).join(' ')}"/></svg>`; }
+function deleteLab(name){ if(!confirm('Delete all results for '+name+'?')) return; S.labs=S.labs.filter(x=>x.name.toLowerCase()!==name.toLowerCase()); save(); render(); }
 function renderHealth(){
   renderSleep();
   const b=S.bodycomp, L=b[b.length-1], P=b[b.length-2];
@@ -459,9 +582,16 @@ function renderHealth(){
    <div class="row" style="margin-top:6px">${miniSpark(b.map(x=>x.bf).filter(Boolean),'var(--f)')}${miniSpark(b.map(x=>x.smm).filter(Boolean),'var(--sky)')}</div>`:'<div class="mute">Scan your first OTF body comp.</div>';
   const bp=S.bp; $('bp').innerHTML=bp.length?bp.slice(-6).reverse().map(x=>{const[c,k]=bpCat(x.sys,x.dia);return `<div class="row between small" style="padding:4px 0"><span>${fmtDate(x.date)} ${x.date.slice(0,4)}</span><b>${x.sys}/${x.dia}${x.pulse?` · ${x.pulse} bpm`:''}</b><span class="pill ${k}">${c}</span></div>`;}).join('')+`<div>${miniSpark(bp.map(x=>x.sys),'var(--red)')}</div>`:"<div class=\"mute small\">Log monthly — you'll get a reminder on the Fuel screen.</div>";
   const by={}; S.labs.forEach(r=>(by[r.name.toLowerCase()]=by[r.name.toLowerCase()]||[]).push(r));
-  const keys=Object.keys(by).sort();
-  $('labs').innerHTML=keys.length?`<table><tr><th>Test</th><th>Latest</th><th>Range</th><th>Trend</th></tr>${keys.map(k=>{const a=by[k].sort((x,y)=>x.date.localeCompare(y.date)),l=a[a.length-1],o=outOfRange(l);
-    return `<tr><td>${esc(l.name)}<div class="small mute">${fmtDate(l.date)} ${l.date.slice(2,4)}</div></td><td class="${o?'flag':''}">${esc(l.value)} <span class="small mute">${esc(l.unit)}</span></td><td class="small mute">${esc(l.range)}</td><td>${miniSpark(a.map(x=>parseFloat(x.value)).filter(x=>!isNaN(x)),o?'var(--red)':'var(--green)')}</td></tr>`;}).join('')}</table><div class="small mute" style="margin-top:6px">Red = outside the lab's reference range. Open the Coach report for what each result means for training.</div>`:'<div class="mute small">Paste or scan your blood work to track every marker over time.</div>';
+  const groups={}; Object.values(by).forEach(a=>{ a.sort((x,y)=>x.date.localeCompare(y.date)); const l=a[a.length-1]; (groups[l.panel||'Other']=groups[l.panel||'Other']||[]).push(a); });
+  const flagged=Object.values(by).map(a=>a[a.length-1]).filter(outOfRange);
+  const rowH=a=>{ const l=a[a.length-1], o=outOfRange(l), prev=a.length>1?a[a.length-2]:null;
+    return `<tr onclick="deleteLab('${esc(l.name).replace(/'/g,"\\'")}')"><td>${esc(l.name)}<div class="small mute">${fmtDate(l.date)} '${l.date.slice(2,4)}${prev?` · was ${esc(prev.value)}`:''}</div></td><td class="${o?'flag':''}">${esc(l.value)}${o?(o==='high'?' ▲':' ▼'):''} <span class="small mute">${esc(l.unit)}</span></td><td class="small mute">${esc(l.range)}</td><td>${miniSpark(a.map(x=>parseFloat(String(x.value).replace(/[<>≤≥]/g,''))).filter(x=>!isNaN(x)),o?'var(--red)':'var(--green)')}</td></tr>`; };
+  const n=Object.keys(by).length, last=S.labs.reduce((m,x)=>x.date>m?x.date:m,'');
+  $('labs').innerHTML=n?`<div class="small mute">${n} markers · latest draw ${fmtDate(last)} ${last.slice(0,4)}</div>
+    ${flagged.length?`<div class="tip" style="border-color:var(--red)"><b class="flag">${flagged.length} outside range:</b> ${flagged.map(l=>esc(l.name)+' '+esc(l.value)).join(' · ')}</div>`:''}
+    <table>${Object.keys(groups).map(g=>`<tr><td colspan="4" class="small" style="color:var(--gold);padding-top:12px">${esc(g)}</td></tr>`+groups[g].map(rowH).join('')).join('')}</table>
+    <div class="small mute" style="margin-top:6px">Red = outside the lab's reference range. Tap a row to delete it. See the Coach report for what flagged results mean for training.</div>`
+    :'<div class="mute small">Add a PDF, screenshot, or pasted text of your blood work to track every marker over time.</div>';
 }
 
 /* ---------- SETTINGS ---------- */
@@ -478,7 +608,7 @@ document.querySelectorAll('#mmSeg button').forEach(b=>b.onclick=()=>{S.settings.
 function saveSettings(quiet){ const s=S.settings,P=S.plan,n=id=>+$(id).value;
   P.step=n('s_step')||100; P.ceil=n('s_ceil')||2500; P.floor=n('s_floor')||1600; P.auto=$('s_auto').checked;
   P.history[P.history.length-1].kcal=Math.max(P.floor,Math.min(P.ceil,n('s_kcal')||2000));
-  s.ratio={p:n('s_rp'),c:n('s_rc'),f:n('s_rf')}; s.gPerLb=n('s_gpl')||1; s.weight=n('s_wt')||s.weight; s.sleepGoal=n('s_sleep')||7.5;
+  s.ratio={p:n('s_rp'),c:n('s_rc'),f:n('s_rf')}; s.gPerLb=n('s_gpl')||1; s.weight=n('s_wt')||s.weight; s.sleepGoal=parseHours($('s_sleep').value)||7.5;
   s.maxHr=n('s_mhr')||207; s.maxHrOtf=n('s_omhr')||192; s.restHr=n('s_rhr')||55;
   s.clientId=$('s_cid').value.trim(); s.secret=$('s_csec').value.trim(); s.api=$('s_api').value.trim().replace(/\/$/,'')||DEFAULT.settings.api;
   save(); if(quiet!==true){toast('Saved');render();} }
@@ -496,6 +626,12 @@ function render(){
   if(v==='v-today')renderToday(); if(v==='v-train')renderTrain(); if(v==='v-race')renderRace(); if(v==='v-health')renderHealth(); if(v==='v-set')fillSettings();
 }
 function boot(){
+  if(typeof LAB_GUIDE!=='undefined') LAB_GUIDE.unshift(
+    {re:/non-?hdl/i, hi:'Non-HDL cholesterol (total minus HDL) captures all the cholesterol types that can build up in arteries. The same levers as LDL apply: more fiber, swapping saturated fat for unsaturated fat, and consistent cardio.'},
+    {re:/^wbc\b|white blood/i, lo:'A mildly low white blood cell count can show up in endurance athletes, after a recent illness, or simply as your normal baseline. Ask your doctor whether it should be rechecked, especially if you get sick often.', hi:'A high white blood cell count can reflect infection, inflammation, or a very hard workout before the draw.'},
+    {re:/alanine aminotransferase/i, hi:'ALT can rise after very hard training. If you trained hard in the 48 hours before the draw, ask about a retest after 2–3 easy days.'},
+    {re:/aspartate aminotransferase/i, hi:'AST is also released by muscle, so hard OTF or race efforts can push it up temporarily.'},
+    {re:/ldl/i, hi:'High LDL: favor fiber (oats, beans, berries), swap saturated fats for olive oil, nuts and fish, and keep cardio consistent.'});
   advancePlan(); applyTheme();
   const code=new URLSearchParams(location.search).get('code');
   if(code){ history.replaceState(null,'',location.pathname);

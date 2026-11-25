@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cut,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cut">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -29,13 +29,12 @@ main{position:relative;z-index:1;padding:0 14px calc(env(safe-area-inset-bottom)
 .mute{color:var(--mute)}.small{font-size:12px}
 .row{display:flex;gap:10px;align-items:center}.between{justify-content:space-between}.wrap{flex-wrap:wrap}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-button,.btn{background:var(--gold);color:#1b1505;border:0;border-radius:14px;padding:11px 15px;font-weight:700;font-size:15px}
+button,.btn{background:var(--gold);color:#1b1505;border:0;border-radius:14px;padding:11px 15px;font-weight:700;font-size:15px;font-family:inherit}
 button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
 button.sm{padding:6px 10px;font-size:13px;border-radius:10px}
 button.danger{background:var(--red);color:#fff}
-input,select,textarea{width:100%;background:rgba(0,0,0,.18);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:10px;font-size:16px;font-family:inherit}
+input,select,textarea{width:100%;background:rgba(0,0,0,.18);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:10px;font-size:16px;font-family:inherit;-webkit-user-select:text;user-select:text}
 body.light input,body.light select,body.light textarea{background:#fff}
-input[type=range]{accent-color:var(--gold);padding:0;border:0;background:none}
 label{font-size:12px;color:var(--mute);display:block;margin:8px 0 4px}
 nav{position:fixed;bottom:0;left:0;right:0;z-index:6;display:flex;justify-content:space-around;padding:8px 6px calc(env(safe-area-inset-bottom) + 6px);background:var(--card);border-top:1px solid var(--line);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
 nav button{background:none;color:var(--mute);font-size:11px;font-weight:600;padding:4px 8px;display:flex;flex-direction:column;align-items:center;gap:2px}
@@ -50,7 +49,7 @@ nav button.on{color:var(--gold)}
 .pill.blue{background:rgba(111,182,217,.18);color:var(--sky)}.pill.red{background:rgba(224,102,79,.2);color:var(--red)}.pill.green{background:rgba(108,196,137,.2);color:var(--green)}
 .sheet{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.55);display:none;align-items:flex-end}
 .sheet.on{display:flex}
-.sheet>div{background:var(--bg);width:100%;max-height:92vh;overflow:auto;border-radius:24px 24px 0 0;padding:18px 16px calc(env(safe-area-inset-bottom) + 20px);border-top:1px solid var(--line)}
+.sheet>div{background:var(--bg);width:100%;max-height:92vh;overflow:auto;-webkit-overflow-scrolling:touch;border-radius:24px 24px 0 0;padding:18px 16px calc(env(safe-area-inset-bottom) + 20px);border-top:1px solid var(--line)}
 .tip{border-left:3px solid var(--gold);padding:6px 0 6px 12px;margin:8px 0}
 .ins{border-left:3px solid var(--gold);padding:8px 0 8px 12px;margin:10px 0}
 .ins.p1{border-color:var(--red)}.ins.p3{border-color:var(--green)}
@@ -67,6 +66,15 @@ nav button.on{color:var(--gold)}
 table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:6px 4px;border-bottom:1px solid var(--line);text-align:left}
 .flag{color:var(--red);font-weight:700}
 .score{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;border:4px solid var(--gold)}
+/* sleep stepper + rating */
+.stepper{display:flex;align-items:center;gap:10px;margin-top:4px}
+.stepper button{width:56px;height:56px;border-radius:50%;font-size:28px;padding:0;line-height:1}
+.stepper input{flex:1;text-align:center;font-size:30px;font-weight:800;padding:8px}
+.rate{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:4px}
+.rate button{padding:12px 0;font-size:18px;background:rgba(0,0,0,.2);color:var(--ink);border:1px solid var(--line)}
+.rate button.on{background:var(--violet);color:#16122e;border-color:var(--violet)}
+.filebtn{display:block;text-align:center;margin-top:10px;color:#1b1505;font-size:15px;position:relative;overflow:hidden}
+.filebtn input{position:absolute;inset:0;opacity:0;width:100%;height:100%}
 </style>
 </head>
 <body>
@@ -133,7 +141,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:6px 4px;b
     <div class="grid2"><div><label>Protein g / lb bodyweight</label><input id="s_gpl" type="number" step="0.05"></div><div><label>Bodyweight (lb)</label><input id="s_wt" type="number" step="0.1"></div></div>
     <div class="small mute">In "both" mode protein is set by g/lb; remaining calories split by your carb:fat ratio.</div></div>
   <div class="card"><h2>Heart Rate & Sleep</h2><div class="grid3"><div><label>Max HR (Garmin)</label><input id="s_mhr" type="number"></div><div><label>OTF Max HR</label><input id="s_omhr" type="number"></div><div><label>Resting HR</label><input id="s_rhr" type="number"></div></div>
-    <div class="grid2"><div><label>Sleep goal (hrs)</label><input id="s_sleep" type="number" step="0.25"></div></div>
+    <div class="grid2"><div><label>Sleep goal (hrs)</label><input id="s_sleep" type="text" inputmode="decimal"></div></div>
     <div class="small mute">Splat estimate = minutes ≥ 84% of OTF max HR. Calibrates when you paste real OTF emails (factor: <b id="calib"></b>).</div></div>
   <div class="card"><h2>Strava Connection</h2>
     <label>Client ID</label><input id="s_cid"><label>Client Secret (stays on this phone)</label><input id="s_csec" type="password">
@@ -142,7 +150,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:6px 4px;b
     <div class="small mute" id="stravaStatus" style="margin-top:8px"></div></div>
   <div class="card"><h2>Look & Data</h2>
     <div class="row wrap"><button class="ghost" onclick="toggleTheme()">Light / Dark</button><button class="ghost" onclick="exportData()">Backup</button><button class="ghost" onclick="document.getElementById('imp').click()">Restore</button></div>
-    <input type="file" id="imp" accept=".json" style="display:none" onchange="importData(this)">
+    <input type="file" id="imp" accept=".json,application/json" style="display:none" onchange="importData(this)">
     <button class="sm danger" style="margin-top:14px" onclick="if(confirm('Erase ALL data on this phone?')){localStorage.removeItem(KEY);location.reload()}">Erase all data</button></div>
   <button style="width:100%" onclick="saveSettings()">Save Settings</button>
 </section>
@@ -176,8 +184,8 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:6px 4px;b
 <!-- LABEL SCAN -->
 <div class="sheet" id="labelSheet" onclick="if(event.target===this)closeSheet('labelSheet')"><div>
   <div class="row between"><h3 style="margin:0">Scan Nutrition Label</h3><button class="sm ghost" onclick="closeSheet('labelSheet')">Cancel</button></div>
-  <div class="small mute" style="margin-top:6px">Take a straight-on photo of the Nutrition Facts panel in good light. The label is read on your phone, so check the numbers before saving.</div>
-  <label class="btn" style="display:block;text-align:center;margin-top:10px;color:#1b1505;font-size:15px">📷 Take / choose photo<input type="file" accept="image/*" capture="environment" style="display:none" onchange="ocrLabel(this.files[0]);this.value=''"></label>
+  <div class="small mute" style="margin-top:6px">Take a straight-on photo of the Nutrition Facts panel in good light. Check the numbers before saving.</div>
+  <label class="btn filebtn">📷 Take / choose photo<input type="file" accept="image/*" onchange="ocrLabel(this.files[0]);this.value=''"></label>
   <img id="lb_img" style="width:100%;border-radius:12px;margin-top:8px;display:none">
   <div id="lbStatus" class="small mute" style="margin-top:6px"></div>
   <label>Food name</label><input id="lb_name" placeholder="e.g. Trader Joe's protein bar">
@@ -192,13 +200,15 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:6px 4px;b
 
 <!-- SLEEP -->
 <div class="sheet" id="sleepSheet" onclick="if(event.target===this)closeSheet('sleepSheet')"><div>
-  <h3 style="margin-top:0">Log Sleep</h3>
-  <label>Morning of</label><input id="sl_date" type="date">
-  <label>Hours slept</label><input id="sl_h" type="number" step="0.25" min="0" max="16" placeholder="7.5" inputmode="decimal">
-  <label>How restful? <b id="sl_rv" style="color:var(--gold);font-size:16px">7</b>/10</label>
-  <input id="sl_r" type="range" min="1" max="10" value="7" oninput="$('sl_rv').textContent=this.value">
-  <div class="row between small mute"><span>😵 Wrecked</span><span>😴 Fully recharged</span></div>
-  <button style="width:100%;margin-top:14px" onclick="saveSleep()">Save</button>
+  <div class="row between"><h3 style="margin:0">🌙 Log Sleep</h3><button class="sm ghost" onclick="closeSheet('sleepSheet')">Cancel</button></div>
+  <label>Morning of</label><input id="sl_date" type="date" onchange="loadSleepFor(this.value)">
+  <label>Hours slept <span class="mute">(tap − / + or type, e.g. 7.5 or 7:30)</span></label>
+  <div class="stepper"><button type="button" class="ghost" onclick="stepSleep(-0.25)">−</button>
+    <input id="sl_h" type="text" inputmode="decimal" autocomplete="off" placeholder="7.5" onblur="normSleep()">
+    <button type="button" class="ghost" onclick="stepSleep(0.25)">+</button></div>
+  <label style="margin-top:14px">How restful? <b id="sl_rv" style="color:var(--violet);font-size:16px">–</b>/10 <span class="mute">(1 = wrecked · 10 = fully recharged)</span></label>
+  <div class="rate" id="sl_rate"></div>
+  <div class="row" style="margin-top:16px"><button class="danger" id="sl_del" style="display:none" onclick="deleteSleep()">Delete</button><button style="flex:1" onclick="saveSleep()">Save</button></div>
 </div></div>
 
 <!-- REPORT -->
@@ -221,7 +231,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:6px 4px;b
 <div class="sheet" id="bcSheet" onclick="if(event.target===this)closeSheet('bcSheet')"><div>
   <h3 style="margin-top:0">OTF Body Comp</h3>
   <div class="small mute">Pick both screenshots (summary + segmental). Values are read on-device; check them before saving.</div>
-  <input type="file" accept="image/*" multiple onchange="ocrBC(this.files)" style="margin-top:8px">
+  <label class="btn filebtn">🖼 Choose screenshots<input type="file" accept="image/*" multiple onchange="ocrBC(this.files);this.value=''"></label>
   <div id="bcStatus" class="small mute"></div>
   <div class="grid2"><div><label>Date</label><input id="bc_date" type="date"></div><div><label>Body fat %</label><input id="bc_bf" type="number" step="0.1"></div>
   <div><label>Weight lb</label><input id="bc_wt" type="number" step="0.1"></div><div><label>Skeletal muscle lb</label><input id="bc_smm" type="number" step="0.1"></div>
@@ -240,11 +250,13 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:6px 4px;b
 
 <!-- LABS -->
 <div class="sheet" id="labSheet" onclick="if(event.target===this)closeSheet('labSheet')"><div>
-  <h3 style="margin-top:0">Add Lab Results</h3>
-  <div class="small mute">Paste lab text from your patient portal, or pick a screenshot/photo of the report. Every result found is listed for review.</div>
-  <label>Lab date</label><input id="lab_date" type="date">
-  <input type="file" accept="image/*" onchange="ocrLabs(this.files[0])" style="margin-top:8px"><div id="labStatus" class="small mute"></div>
-  <textarea id="lab_txt" rows="6" placeholder="Paste lab report text…"></textarea>
+  <div class="row between"><h3 style="margin:0">Add Lab Results</h3><button class="sm ghost" onclick="closeSheet('labSheet')">Cancel</button></div>
+  <div class="small mute" style="margin-top:6px">Pick a <b>PDF</b> from Files/Downloads, a screenshot or photo, or paste text from your patient portal. Every result found is listed for review.</div>
+  <label class="btn filebtn">📄 Choose lab file (PDF or image)<input type="file" accept="application/pdf,.pdf,image/*,text/plain,.txt" onchange="handleLabFile(this.files[0]);this.value=''"></label>
+  <div id="labStatus" class="small mute" style="margin-top:6px"></div>
+  <label>Lab / collection date</label><input id="lab_date" type="date">
+  <label>Or paste text</label>
+  <textarea id="lab_txt" rows="5" placeholder="Paste lab report text…"></textarea>
   <button class="ghost" style="width:100%;margin-top:6px" onclick="parseLabs(document.getElementById('lab_txt').value)">Find results</button>
   <table id="labTbl" style="margin-top:10px"></table>
   <button class="sm ghost" style="margin-top:6px" onclick="addLabRow()">+ Row</button>
