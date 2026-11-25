@@ -62,9 +62,13 @@ nav button.on{color:var(--gold)}
 .badge{display:inline-flex;flex-direction:column;align-items:center;width:72px;margin:4px;font-size:11px;text-align:center;opacity:.35}
 .badge.got{opacity:1}.badge b{font-size:26px}
 #reader{width:100%;border-radius:14px;overflow:hidden}
+.toast.err{background:var(--red);color:#fff}
 .toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 14px);transform:translateX(-50%);background:var(--gold);color:#1b1505;padding:10px 16px;border-radius:14px;font-weight:700;z-index:50;display:none}
 table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:6px 4px;border-bottom:1px solid var(--line);text-align:left}
 .flag{color:var(--red);font-weight:700}
+nav button{position:relative}.ndot{position:absolute;top:0;right:6px;min-width:17px;height:17px;border-radius:9px;background:var(--red);color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 4px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}.chip{flex:1;min-width:64px;text-align:center;padding:8px 4px;border-radius:12px;border:1px solid var(--line);font-size:12px;font-weight:700;background:rgba(0,0,0,.15)}
+.chip.done{background:rgba(108,196,137,.18);border-color:var(--green);color:var(--green)}.chip.due{border-color:var(--gold);color:var(--gold)}
 .score{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;border:4px solid var(--gold)}
 /* sleep stepper + rating */
 .stepper{display:flex;align-items:center;gap:10px;margin-top:4px}
@@ -85,6 +89,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:6px 4px;b
 <main>
 <!-- TODAY -->
 <section class="view on" id="v-today">
+  <div id="checklist"></div>
   <div class="card">
     <h2><span>Today's Fuel</span><span class="row"><button class="sm ghost" onclick="shiftDay(-1)">‹</button><span id="dayLbl"></span><button class="sm ghost" onclick="shiftDay(1)">›</button></span></h2>
     <div class="ring-wrap"><svg id="ring" width="120" height="120" viewBox="0 0 120 120"></svg>
@@ -92,6 +97,15 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:6px 4px;b
         <div class="small" style="margin-top:6px"><span id="kcalEaten">0</span> eaten · goal <b id="kcalGoal">0</b></div>
         <div style="margin-top:6px" id="phasePill"></div></div></div>
     <div id="macroBars"></div>
+  </div>
+  <div class="card" id="waterCard"><h2><span>💧 Water</span><span class="small" id="waterPct"></span></h2>
+    <div class="row between"><div><span class="big" id="waterOz">0</span> <span class="mute">/ <span id="waterGoal">128</span> oz</span></div><div id="waterBottles" class="small mute"></div></div>
+    <div class="bar" style="margin-top:10px;height:14px"><i id="waterBar" style="width:0%;background:linear-gradient(90deg,#4f9bd9,#8fd3f4)"></i></div>
+    <div class="grid3" style="grid-template-columns:repeat(5,1fr);margin-top:10px;gap:6px">
+      <button class="sm" style="background:var(--sky)" onclick="addWater(8)">+8</button><button class="sm" style="background:var(--sky)" onclick="addWater(16)">+16</button>
+      <button class="sm" style="background:var(--sky)" onclick="addWater(24)">+24</button><button class="sm" style="background:var(--sky)" onclick="addWater(32)">+32</button>
+      <button class="sm ghost" onclick="addWater(-8)">−8</button></div>
+    <div class="row" style="margin-top:8px"><input id="waterCustom" type="text" inputmode="numeric" placeholder="Custom oz" style="flex:1"><button class="sm ghost" onclick="addWater(parseFloat($('waterCustom').value)||0);$('waterCustom').value=''">Add</button></div>
   </div>
   <div id="sleepPrompt"></div>
   <div id="bpPrompt"></div>
@@ -121,10 +135,11 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:6px 4px;b
 
 <!-- HEALTH -->
 <section class="view" id="v-health">
+  <div id="healthSummary"></div>
   <div class="card"><h2><span>Sleep</span><button class="sm" onclick="openSleep()">+ Sleep</button></h2><div id="sleep"></div></div>
   <div class="card"><h2><span>Body Comp (OTF)</span><button class="sm" onclick="openSheet('bcSheet')">+ Scan</button></h2><div id="bc"></div></div>
   <div class="card"><h2><span>Blood Pressure</span><button class="sm" onclick="openSheet('bpSheet')">+ BP</button></h2><div id="bp"></div></div>
-  <div class="card"><h2><span>Lab Results</span><button class="sm" onclick="openSheet('labSheet')">+ Labs</button></h2><div id="labs"></div></div>
+  <div class="card" id="labsCard"><h2><span>🧪 Lab Results</span><button class="sm" onclick="openSheet('labSheet')">+ Labs</button></h2><div id="labs"></div></div>
 </section>
 
 <!-- SETTINGS -->
@@ -143,6 +158,27 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:6px 4px;b
   <div class="card"><h2>Heart Rate & Sleep</h2><div class="grid3"><div><label>Max HR (Garmin)</label><input id="s_mhr" type="number"></div><div><label>OTF Max HR</label><input id="s_omhr" type="number"></div><div><label>Resting HR</label><input id="s_rhr" type="number"></div></div>
     <div class="grid2"><div><label>Sleep goal (hrs)</label><input id="s_sleep" type="text" inputmode="decimal"></div></div>
     <div class="small mute">Splat estimate = minutes ≥ 84% of OTF max HR. Calibrates when you paste real OTF emails (factor: <b id="calib"></b>).</div></div>
+  <div class="card"><h2>Water</h2><div class="grid2"><div><label>Daily goal (oz)</label><input id="s_water" type="text" inputmode="numeric"></div></div></div>
+  <div class="card"><h2>🔔 Notifications & Badge</h2>
+    <div id="notifState" class="small"></div>
+    <label>Push server URL (your Cloudflare Worker)</label><input id="s_push" placeholder="https://summit-push.YOURNAME.workers.dev" autocapitalize="off" autocorrect="off">
+    <div class="row wrap" style="margin-top:10px"><button onclick="enablePush()">🔔 Turn on notifications</button><button class="ghost" onclick="testPush()">Send test</button></div>
+    <div class="small mute" style="margin-top:10px">Reminders only fire if that item isn't logged yet. Leave a time blank to turn it off.</div>
+    <div class="grid2">
+      <div><label>🌙 Sleep</label><input id="r_sleep" type="time"></div>
+      <div><label>🍽 Breakfast/lunch</label><input id="r_food1" type="time"></div>
+      <div><label>🍽 Dinner</label><input id="r_food2" type="time"></div>
+      <div><label>💧 Water 1 (if behind pace)</label><input id="r_w1" type="time"></div>
+      <div><label>💧 Water 2 (if behind pace)</label><input id="r_w2" type="time"></div>
+      <div><label>💧 Water 3 (if under goal)</label><input id="r_w3" type="time"></div>
+      <div><label>🩺 BP (when 30+ days)</label><input id="r_bp" type="time"></div>
+      <div><label>⛰ Coach report (Sun)</label><input id="r_week" type="time"></div>
+    </div>
+    <button style="width:100%;margin-top:12px" onclick="saveSettings();syncPush(true)">Save reminder times</button>
+    <details style="margin-top:12px"><summary class="small mute">No server? Use Calendar reminders instead</summary>
+      <button class="ghost" style="width:100%;margin-top:8px" onclick="makeReminders()">📅 Add reminders to Calendar</button><div class="small mute" id="remStatus" style="margin-top:6px"></div></details>
+  </div>
+  <div class="card"><h2>App Info</h2><div id="diag" class="small"></div></div>
   <div class="card"><h2>Strava Connection</h2>
     <label>Client ID</label><input id="s_cid"><label>Client Secret (stays on this phone)</label><input id="s_csec" type="password">
     <label>API base URL</label><input id="s_api">
@@ -250,7 +286,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:6px 4px;b
 
 <!-- LABS -->
 <div class="sheet" id="labSheet" onclick="if(event.target===this)closeSheet('labSheet')"><div>
-  <div class="row between"><h3 style="margin:0">Add Lab Results</h3><button class="sm ghost" onclick="closeSheet('labSheet')">Cancel</button></div>
+  <div class="row between" style="position:sticky;top:-18px;z-index:2;background:var(--bg);padding:10px 0;margin-top:-10px"><h3 style="margin:0">Add Lab Results</h3><span class="row"><button class="sm ghost" onclick="closeSheet('labSheet')">Cancel</button><button class="sm" id="labSaveTop" onclick="saveLabs()">Save</button></span></div>
   <div class="small mute" style="margin-top:6px">Pick a <b>PDF</b> from Files/Downloads, a screenshot or photo, or paste text from your patient portal. Every result found is listed for review.</div>
   <label class="btn filebtn">📄 Choose lab file (PDF or image)<input type="file" accept="application/pdf,.pdf,image/*,text/plain,.txt" onchange="handleLabFile(this.files[0]);this.value=''"></label>
   <div id="labStatus" class="small mute" style="margin-top:6px"></div>
@@ -260,7 +296,7 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:6px 4px;b
   <button class="ghost" style="width:100%;margin-top:6px" onclick="parseLabs(document.getElementById('lab_txt').value)">Find results</button>
   <table id="labTbl" style="margin-top:10px"></table>
   <button class="sm ghost" style="margin-top:6px" onclick="addLabRow()">+ Row</button>
-  <button style="width:100%;margin-top:12px" onclick="saveLabs()">Save results</button>
+  <button type="button" style="width:100%;margin-top:12px" onclick="saveLabs()">Save results</button>
 </div></div>
 
 <!-- RACE EDIT -->

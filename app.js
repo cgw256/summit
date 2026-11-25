@@ -1,5 +1,5 @@
 /* Summit – Peaks Fitness Coach. All data lives in this phone's storage. */
-const KEY = 'summit.v1';
+const KEY = 'summit.v1', APP_VERSION = 'v7';
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const iso = d => { d = new Date(d); return new Date(d - d.getTimezoneOffset()*6e4).toISOString().slice(0,10); };
@@ -12,12 +12,15 @@ const pace = sPerMi => hms(sPerMi)+'/mi';
 const M2MI = 1/1609.344, M2FT = 3.28084;
 const r0 = n => Math.round(n||0);
 const avg = a => a.length ? a.reduce((x,y)=>x+y,0)/a.length : null;
-function toast(t){ const e=$('toast'); e.textContent=t; e.style.display='block'; clearTimeout(toast.t); toast.t=setTimeout(()=>e.style.display='none',2600); }
+function showErr(m){ const e=$('toast'); e.classList.add('err'); e.textContent='⚠ '+m; e.style.display='block'; clearTimeout(toast.t); toast.t=setTimeout(()=>{e.style.display='none';e.classList.remove('err');},8000); }
+window.addEventListener('error',ev=>showErr(ev.message||'Unknown error'));
+window.addEventListener('unhandledrejection',ev=>showErr(String(ev.reason&&ev.reason.message||ev.reason)));
+function toast(t){ $('toast').classList.remove('err');  const e=$('toast'); e.textContent=t; e.style.display='block'; clearTimeout(toast.t); toast.t=setTimeout(()=>e.style.display='none',2600); }
 
 /* ---------- STATE ---------- */
 const DEFAULT = {
-  settings:{maxHr:207,maxHrOtf:192,restHr:55,weight:179.3,gPerLb:1.0,ratio:{p:30,c:40,f:30},macroMode:'both',sleepGoal:7.5,
-    clientId:'',secret:'',api:'https://www.strava.com/api/v3',theme:'dark',splatCal:1},
+  settings:{maxHr:207,maxHrOtf:192,restHr:55,weight:179.3,gPerLb:1.0,ratio:{p:30,c:40,f:30},macroMode:'both',sleepGoal:7.5,waterGoal:128,pushUrl:'',reminders:{sleep:'07:00',food1:'12:30',food2:'19:30',w1:'10:00',w2:'14:00',w3:'17:30',bp:'08:00',week:'18:00'},
+    clientId:'',secret:'',deviceId:'',deviceToken:'',api:'https://www.strava.com/api/v3',theme:'dark',splatCal:1},
   strava:{}, activities:[],
   races:[
     {id:'beast26',name:'Spartan Beast – Arizona',type:'spartan-beast',date:'2026-11-21',done:true,
@@ -26,11 +29,11 @@ const DEFAULT = {
   food:{}, favorites:[], recentFoods:[], myFoods:[],
   plan:{phase:'build',step:100,ceil:2500,floor:1600,auto:true,history:[]},
   bodycomp:[{date:'2026-07-10',bf:14.8,wt:179.3,smm:88.2,bfm:26.5,bmr:2240.4,seg:{tr:66.8,la:8.8,ra:8.9,ll:22.4,rl:22.3}}],
-  labs:[], bp:[], sleep:[], otfEmails:[]
+  labs:[], bp:[], sleep:[], water:{}, otfEmails:[]
 };
 let S = load();
 function load(){ try{ const s=JSON.parse(localStorage.getItem(KEY)); if(s){ const m=Object.assign(structuredClone(DEFAULT),s); m.settings=Object.assign({},DEFAULT.settings,s.settings); return m; } }catch(e){} return structuredClone(DEFAULT); }
-function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){ toast('Storage full – make a backup'); } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); afterSave(); }catch(e){ showErr('Could not save ('+e.name+'). Phone storage may be full or blocked.'); } }
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
 
 /* ---------- TOPO BACKGROUND (San Francisco Peaks) ---------- */
@@ -116,8 +119,17 @@ function renderToday(){
     :`<div class="card" style="border-color:var(--violet)"><div class="row between"><span>🌙 How did you sleep last night?</span><button class="sm" style="background:var(--violet)" onclick="openSleep()">Log</button></div></div>`;
   const lastBp=S.bp[S.bp.length-1];
   $('bpPrompt').innerHTML=(!lastBp||daysBetween(lastBp.date,today())>=30)?`<div class="card" style="border-color:var(--gold)"><div class="row between"><span>🩺 Monthly blood pressure check is due</span><button class="sm" onclick="openSheet('bpSheet')">Log</button></div></div>`:'';
+  renderWater(); renderChecklist();
   if(typeof renderCoachCard==='function') renderCoachCard();
 }
+/* ---------- WATER ---------- */
+function addWater(oz){ if(!oz) return; const d=day, before=S.water[d]||0; S.water[d]=Math.max(0,Math.round((before+oz)*10)/10); save();
+  const g=S.settings.waterGoal; if(before<g&&S.water[d]>=g) toast('💧 Water goal hit! Summit hydrated.'); renderWater(); }
+function renderWater(){ const oz=S.water[day]||0, g=S.settings.waterGoal||128, p=Math.min(1,oz/g);
+  $('waterOz').textContent=r0(oz); $('waterGoal').textContent=g; $('waterBar').style.width=(p*100)+'%';
+  $('waterPct').innerHTML=p>=1?'<span class="pill green">✓ Goal</span>':`${r0(g-oz)} oz to go`;
+  const h=new Date().getHours(), expected=day===today()?g*Math.max(0,Math.min(1,(h-7)/14)):g;
+  $('waterBottles').innerHTML=day===today()&&oz<expected-16?`<span style="color:var(--gold)">Behind pace (~${r0(expected)} oz by now)</span>`:`${(oz/8).toFixed(0)} cups`; }
 function delFood(i){ dayFood(day).splice(i,1); save(); render(); }
 function copyYesterday(){ const y=S.food[addDays(day,-1)]||[]; if(!y.length) return toast('Nothing logged yesterday'); y.forEach(x=>dayFood(day).push({...x})); save(); render(); toast('Copied '+y.length+' items'); }
 function openFood(){ openSheet('foodSheet'); setSeg('mealSeg','m',meal); renderRecent(); }
@@ -552,14 +564,27 @@ function renderLabTbl(){
   let lastPanel=null, html='<tr><th>Test</th><th>Value</th><th>Range</th><th></th></tr>';
   labRows.forEach((r,i)=>{ if(r.panel&&r.panel!==lastPanel){ lastPanel=r.panel; html+=`<tr><td colspan="4" class="small" style="color:var(--gold);padding-top:10px">${esc(r.panel)}</td></tr>`; }
     const o=r.value&&outOfRange(r);
-    html+=`<tr><td><input style="padding:5px;font-size:14px" value="${esc(r.name)}" onchange="labRows[${i}].name=this.value"></td>
-      <td><input style="padding:5px;font-size:14px;width:70px;${o?'color:var(--red);font-weight:700':''}" value="${esc(r.value)}" onchange="labRows[${i}].value=this.value"><div class="small mute">${esc(r.unit)}${r.flag?` <span class="flag">${r.flag}</span>`:''}</div></td>
-      <td><input style="padding:5px;font-size:14px;width:84px" value="${esc(r.range)}" onchange="labRows[${i}].range=this.value"></td>
+    html+=`<tr data-i="${i}"><td><input data-k="name" style="padding:5px;font-size:14px" value="${esc(r.name)}" onchange="labRows[${i}].name=this.value"></td>
+      <td><input data-k="value" style="padding:5px;font-size:14px;width:70px;${o?'color:var(--red);font-weight:700':''}" value="${esc(r.value)}" onchange="labRows[${i}].value=this.value"><div class="small mute">${esc(r.unit)}${r.flag?` <span class="flag">${r.flag}</span>`:''}</div></td>
+      <td><input data-k="range" style="padding:5px;font-size:14px;width:84px" value="${esc(r.range)}" onchange="labRows[${i}].range=this.value"></td>
       <td><button class="sm ghost" onclick="labRows.splice(${i},1);renderLabTbl()">✕</button></td></tr>`; });
   $('labTbl').innerHTML=labRows.length?html:''; }
-function saveLabs(){ const d=$('lab_date').value||today(), rows=labRows.filter(r=>r.name&&r.value); if(!rows.length) return toast('No results to save');
-  S.labs=S.labs.filter(x=>!(x.date===d&&rows.some(r=>r.name.toLowerCase()===x.name.toLowerCase())));
-  rows.forEach(r=>S.labs.push({date:d,...r})); labRows=[]; renderLabTbl(); $('lab_txt').value=''; $('labStatus').textContent=''; save(); closeSheet('labSheet'); render(); toast(rows.length+' lab results saved'); }
+function saveLabs(){
+  try{
+    if(document.activeElement&&document.activeElement.blur) document.activeElement.blur();   // commit any edit in progress
+    document.querySelectorAll('#labTbl tr[data-i]').forEach(tr=>{ const r=labRows[+tr.dataset.i]; if(!r) return;
+      tr.querySelectorAll('input[data-k]').forEach(inp=>r[inp.dataset.k]=inp.value.trim()); });
+    const d=$('lab_date').value||today(), rows=labRows.filter(r=>r&&String(r.name||'').trim()&&String(r.value||'').trim());
+    if(!rows.length){ toast('No results to save — load a file first'); return; }
+    const keys=new Set(rows.map(r=>String(r.name).toLowerCase()));
+    S.labs=(S.labs||[]).filter(x=>!(x.date===d&&keys.has(String(x.name).toLowerCase())));
+    rows.forEach(r=>S.labs.push({date:d,name:String(r.name),value:String(r.value),flag:r.flag||'',unit:r.unit||'',range:r.range||'',panel:r.panel||''}));
+    localStorage.setItem(KEY, JSON.stringify(S));                       // save first, before any UI work
+    labRows=[]; $('labTbl').innerHTML=''; $('lab_txt').value=''; $('labStatus').textContent='';
+    closeSheet('labSheet'); toast(rows.length+' lab results saved ✓');
+    try{ render(); }catch(e){ showErr('Saved, but display error: '+e.message); }
+  }catch(e){ showErr('Save failed: '+(e&&e.message||e)); }
+}
 function outOfRange(r){
   if(r.flag==='H') return 'high'; if(r.flag==='L') return 'low';
   const v=parseFloat(String(r.value).replace(/[<>≤≥=]/g,'')), R=cleanRange(r.range); if(isNaN(v)||!R) return false;
@@ -573,6 +598,12 @@ function miniSpark(vals,color){ if(vals.length<2) return ''; const mx=Math.max(.
   return `<svg width="${W}" height="${H}"><polyline fill="none" stroke="${color}" stroke-width="2" points="${vals.map((v,i)=>`${i/(vals.length-1)*W},${H-2-(mx===mn?.5:(v-mn)/(mx-mn))*(H-4)}`).join(' ')}"/></svg>`; }
 function deleteLab(name){ if(!confirm('Delete all results for '+name+'?')) return; S.labs=S.labs.filter(x=>x.name.toLowerCase()!==name.toLowerCase()); save(); render(); }
 function renderHealth(){
+  const nl=new Set(S.labs.map(x=>x.name.toLowerCase())).size, nFlag=(()=>{const L={};S.labs.forEach(r=>{const k=r.name.toLowerCase();if(!L[k]||r.date>=L[k].date)L[k]=r;});return Object.values(L).filter(outOfRange).length;})();
+  const s7=sleepWindow(7), w7=[...Array(7)].map((_,i)=>S.water[addDays(today(),-i)]||0).filter(x=>x>0);
+  $('healthSummary').innerHTML=`<div class="card"><div class="grid3">
+    <div onclick="$('labsCard').scrollIntoView({behavior:'smooth'})"><div class="big" style="font-size:24px">${nl}</div><div class="small mute">lab markers${nFlag?` · <span class="flag">${nFlag} flagged</span>`:''}</div></div>
+    <div><div class="big" style="font-size:24px">${s7.length?avg(s7.map(x=>x.hrs)).toFixed(1):'–'}</div><div class="small mute">sleep hrs (7d)</div></div>
+    <div><div class="big" style="font-size:24px">${w7.length?r0(avg(w7)):'–'}</div><div class="small mute">water oz/day (7d)</div></div></div></div>`;
   renderSleep();
   const b=S.bodycomp, L=b[b.length-1], P=b[b.length-2];
   const d=k=>{ if(!P||L[k]==null||P[k]==null) return ''; const up=L[k]>P[k], bad=(k==='bf'||k==='bfm')===up; return ` <span class="small" style="color:${bad?'var(--red)':'var(--green)'}">${up?'▲':'▼'}${Math.abs(L[k]-P[k]).toFixed(1)}</span>`; };
@@ -597,7 +628,7 @@ function renderHealth(){
 /* ---------- SETTINGS ---------- */
 function fillSettings(){ const s=S.settings,P=S.plan;
   $('s_kcal').value=curKcal(); $('s_step').value=P.step; $('s_ceil').value=P.ceil; $('s_floor').value=P.floor; $('s_auto').checked=P.auto;
-  $('s_rp').value=s.ratio.p; $('s_rc').value=s.ratio.c; $('s_rf').value=s.ratio.f; $('s_gpl').value=s.gPerLb; $('s_wt').value=s.weight; $('s_sleep').value=s.sleepGoal;
+  $('s_rp').value=s.ratio.p; $('s_rc').value=s.ratio.c; $('s_rf').value=s.ratio.f; $('s_gpl').value=s.gPerLb; $('s_wt').value=s.weight; $('s_sleep').value=s.sleepGoal; $('s_water').value=s.waterGoal; const R=s.reminders||{}; ['sleep','food1','food2','w1','w2','w3','bp','week'].forEach(k=>$('r_'+k).value=R[k]||''); renderDiag(); $('s_push').value=s.pushUrl||''; renderNotifState();
   $('s_mhr').value=s.maxHr; $('s_omhr').value=s.maxHrOtf; $('s_rhr').value=s.restHr; $('s_cid').value=s.clientId; $('s_csec').value=s.secret; $('s_api').value=s.api;
   $('calib').textContent='×'+s.splatCal; setSeg('phaseSeg','p',P.phase); setSeg('mmSeg','m',s.macroMode);
   $('stravaStatus').innerHTML=S.strava.refresh?`✅ Connected${S.strava.athlete?' as '+esc(S.strava.athlete):''}`:'Not connected.';
@@ -608,30 +639,106 @@ document.querySelectorAll('#mmSeg button').forEach(b=>b.onclick=()=>{S.settings.
 function saveSettings(quiet){ const s=S.settings,P=S.plan,n=id=>+$(id).value;
   P.step=n('s_step')||100; P.ceil=n('s_ceil')||2500; P.floor=n('s_floor')||1600; P.auto=$('s_auto').checked;
   P.history[P.history.length-1].kcal=Math.max(P.floor,Math.min(P.ceil,n('s_kcal')||2000));
-  s.ratio={p:n('s_rp'),c:n('s_rc'),f:n('s_rf')}; s.gPerLb=n('s_gpl')||1; s.weight=n('s_wt')||s.weight; s.sleepGoal=parseHours($('s_sleep').value)||7.5;
+  s.ratio={p:n('s_rp'),c:n('s_rc'),f:n('s_rf')}; s.gPerLb=n('s_gpl')||1; s.weight=n('s_wt')||s.weight; s.sleepGoal=parseHours($('s_sleep').value)||7.5; s.waterGoal=parseFloat($('s_water').value)||128; s.pushUrl=$('s_push').value.trim(); s.reminders={}; ['sleep','food1','food2','w1','w2','w3','bp','week'].forEach(k=>s.reminders[k]=$('r_'+k).value);
   s.maxHr=n('s_mhr')||207; s.maxHrOtf=n('s_omhr')||192; s.restHr=n('s_rhr')||55;
   s.clientId=$('s_cid').value.trim(); s.secret=$('s_csec').value.trim(); s.api=$('s_api').value.trim().replace(/\/$/,'')||DEFAULT.settings.api;
-  save(); if(quiet!==true){toast('Saved');render();} }
+  save(); if(quiet!==true){toast('Saved');render(); syncPush();} }
 function toggleTheme(){ S.settings.theme=S.settings.theme==='light'?'dark':'light'; save(); applyTheme(); }
 function applyTheme(){ document.body.classList.toggle('light',S.settings.theme==='light'); drawTopo(); }
-function exportData(){ const blob=new Blob([JSON.stringify({...S,settings:{...S.settings,secret:''},strava:{}})],{type:'application/json'});
+function exportData(){ const blob=new Blob([JSON.stringify({...S,settings:{...S.settings,secret:'',deviceToken:'',pushSub:null},strava:{}})],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='summit-backup-'+today()+'.json'; a.click(); toast('Backup saved (Strava keys excluded)'); }
 function importData(inp){ const f=inp.files[0]; if(!f)return; f.text().then(t=>{ const d=JSON.parse(t), keep={settings:S.settings,strava:S.strava};
-  S=Object.assign(structuredClone(DEFAULT),d); S.settings=Object.assign({},DEFAULT.settings,d.settings,{clientId:keep.settings.clientId,secret:keep.settings.secret}); S.strava=keep.strava; save(); toast('Restored'); render(); }).catch(()=>toast('Invalid backup')); }
+  S=Object.assign(structuredClone(DEFAULT),d); S.settings=Object.assign({},DEFAULT.settings,d.settings,{clientId:keep.settings.clientId,secret:keep.settings.secret,deviceId:keep.settings.deviceId,deviceToken:keep.settings.deviceToken,pushSub:keep.settings.pushSub,pushUrl:keep.settings.pushUrl}); S.strava=keep.strava; save(); toast('Restored'); render(); }).catch(()=>toast('Invalid backup')); }
 
+/* ---------- CHECKLIST + BADGE + PUSH ---------- */
+function todayStatus(){ const d=today(), f=S.food[d]||[], lastBp=S.bp.length?S.bp[S.bp.length-1].date:null;
+  return {date:d,sleep:!!S.sleep.find(x=>x.date===d),water:S.water[d]||0,waterGoal:S.settings.waterGoal||128,meals:[...new Set(f.map(x=>x.meal))],bpDate:lastBp,streak:streak()}; }
+function todoList(){ const st=todayStatus(), h=new Date().getHours()+new Date().getMinutes()/60, g=st.waterGoal;
+  const bpDue=!st.bpDate||daysBetween(st.bpDate,today())>=30, has=m=>st.meals.includes(m);
+  return [
+    {k:'sleep',icon:'🌙',label:'Sleep',done:st.sleep,due:true,act:"openSleep()"},
+    {k:'water',icon:'💧',label:`${r0(st.water)}/${g}`,done:st.water>=g,due:true,act:"$('waterCard').scrollIntoView({behavior:'smooth'})"},
+    {k:'lunch',icon:'🥗',label:'Lunch',done:has('Breakfast')||has('Lunch'),due:h>=11,act:"meal='Lunch';openFood()"},
+    {k:'dinner',icon:'🍽',label:'Dinner',done:has('Dinner'),due:h>=18,act:"meal='Dinner';openFood()"},
+    ...(bpDue?[{k:'bp',icon:'🩺',label:'BP',done:false,due:true,act:"openSheet('bpSheet')"}]:[])]; }
+function badgeNum(){ return todoList().filter(t=>t.due&&!t.done).length; }
+function renderChecklist(){ if(day!==today()){ $('checklist').innerHTML=''; return; }
+  const L=todoList(), left=L.filter(t=>t.due&&!t.done).length, s=streak();
+  $('checklist').innerHTML=`<div class="card" style="padding:12px 14px"><div class="row between small" style="margin-bottom:8px"><b>${left?`⛺ ${left} left to reach today's summit`:'🏔 Summit reached — everything logged!'}</b><span class="mute">${s>=2?'🔥 '+s+'-day streak':''}</span></div>
+    <div class="chips">${L.map(t=>`<div class="chip ${t.done?'done':t.due?'due':''}" onclick="${t.act}">${t.done?'✓':t.icon} ${esc(t.label)}</div>`).join('')}</div></div>`; }
+function updateBadge(){ const n=badgeNum();
+  try{ if(navigator.setAppBadge){ n?navigator.setAppBadge(n).catch(()=>{}):navigator.clearAppBadge().catch(()=>{}); } }catch(e){}
+  const fuel=document.querySelector('nav button[data-v="today"]'); if(fuel){ let d=fuel.querySelector('.ndot'); if(n){ if(!d){d=document.createElement('span');d.className='ndot';fuel.appendChild(d);} d.textContent=n; } else if(d) d.remove(); } }
+let statusTimer=null, lastStatus='';
+function afterSave(){ updateBadge(); clearTimeout(statusTimer); statusTimer=setTimeout(pushStatus,4000); }
+async function pushStatus(){ const s=S.settings; if(!s.pushUrl||!s.deviceId) return; const st=JSON.stringify(todayStatus()); if(st===lastStatus) return;
+  try{ const r=await fetch(s.pushUrl.replace(/\/$/,'')+'/status',{method:'POST',body:JSON.stringify({id:s.deviceId,token:s.deviceToken,status:JSON.parse(st)})}); if(r.ok) lastStatus=st; }catch(e){} }
+const b64uToBytes=s=>{ s=s.replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; return Uint8Array.from(atob(s),c=>c.charCodeAt(0)); };
+function renderNotifState(){
+  const standalone=navigator.standalone||matchMedia('(display-mode: standalone)').matches, perm=('Notification' in window)?Notification.permission:'unsupported', s=S.settings;
+  $('notifState').innerHTML=[
+    standalone?'✅ Running as Home Screen app':'⚠️ <b>Open Summit from your Home Screen icon</b> — iPhone only allows notifications there.',
+    perm==='granted'?'✅ Notifications allowed':perm==='denied'?'⛔ Notifications blocked — iPhone Settings → Notifications → Summit → Allow':perm==='unsupported'?'⚠️ This iOS version doesn\'t support web notifications (need iOS 16.4+)':'○ Notifications not turned on yet',
+    s.deviceId&&s.pushUrl?'✅ Connected to push server':'○ Push server not connected (badge still works while you use the app)'].map(x=>`<div style="margin:3px 0">${x}</div>`).join(''); }
+async function enablePush(){
+  saveSettings(true); const s=S.settings;
+  if(!('Notification' in window)||!('serviceWorker' in navigator)) return showErr('Notifications need Summit opened from the Home Screen on iOS 16.4+');
+  const perm=await Notification.requestPermission(); renderNotifState(); if(perm!=='granted') return showErr('Notifications not allowed');
+  updateBadge();
+  if(!s.pushUrl) return toast('Badge is on ✓ Add your push server URL for reminders when the app is closed');
+  try{
+    const base=s.pushUrl.replace(/\/$/,''), {publicKey}=await (await fetch(base+'/key')).json();
+    const reg=await navigator.serviceWorker.ready; let sub=await reg.pushManager.getSubscription();
+    if(sub){ try{ await sub.unsubscribe(); }catch(e){} }
+    sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64uToBytes(publicKey)});
+    if(!s.deviceId){ s.deviceId=crypto.randomUUID(); s.deviceToken=crypto.randomUUID()+crypto.randomUUID(); localStorage.setItem(KEY,JSON.stringify(S)); }
+    s.pushSub=sub.toJSON(); await syncPush(); renderNotifState(); toast('🔔 Notifications on! Sending a test…'); setTimeout(testPush,800);
+  }catch(e){ showErr('Push setup failed: '+e.message+'. Check the server URL.'); }
+}
+async function syncPush(showToast){ const s=S.settings; if(!s.pushUrl||!s.deviceId||!s.pushSub) return;
+  try{ const r=await fetch(s.pushUrl.replace(/\/$/,'')+'/subscribe',{method:'POST',body:JSON.stringify({id:s.deviceId,token:s.deviceToken,subscription:s.pushSub,tz:Intl.DateTimeFormat().resolvedOptions().timeZone,reminders:s.reminders,status:todayStatus()})});
+    const j=await r.json(); if(!j.ok) throw new Error(j.error||r.status); lastStatus=JSON.stringify(todayStatus()); if(showToast) toast('Reminder times synced ✓'); }
+  catch(e){ showErr('Could not reach push server: '+e.message); } }
+async function testPush(){ const s=S.settings; if(!s.pushUrl||!s.deviceId) return showErr('Turn on notifications first');
+  try{ const j=await (await fetch(s.pushUrl.replace(/\/$/,'')+'/test',{method:'POST',body:JSON.stringify({id:s.deviceId,token:s.deviceToken})})).json();
+    j.ok?toast('Test sent — check your lock screen'):showErr('Test failed: '+(j.error||j.status)); }catch(e){ showErr('Test failed: '+e.message); } }
+/* ---------- REMINDERS (.ics calendar file) ---------- */
+function makeReminders(){
+  saveSettings(true); const R=S.settings.reminders, url=location.origin+location.pathname, d0=today().replace(/-/g,'');
+  const items=[['sleep','🌙 Summit: log last night\'s sleep','Hours + restful 1–10. Takes 5 seconds.','DAILY'],['food1','🍽 Summit: log your meals','Log breakfast and lunch while you remember.','DAILY'],
+    ['food2','🍽 Summit: log dinner + check macros','Finish today\'s food log and check your protein.','DAILY'],['w1','💧 Summit: water check','Goal '+S.settings.waterGoal+' oz. Log what you\'ve had.','DAILY'],
+    ['w2','💧 Summit: water check','Halfway point: aim for ~'+r0(S.settings.waterGoal/2)+' oz by now.','DAILY'],['w3','💧 Summit: water check','Last push before evening.','DAILY'],
+    ['bp','🩺 Summit: monthly blood pressure','Seated, after 5 min rest. Log it in Summit.','MONTHLY;BYMONTHDAY=1'],['week','⛰ Summit: weekly coach check','Sync Strava and open the Coach report.','WEEKLY;BYDAY=SU']];
+  const ev=items.filter(([k])=>R[k]).map(([k,title,desc,rr])=>{ const t=R[k].replace(':','')+'00';
+    return ['BEGIN:VEVENT','UID:summit-'+k+'@summit.app','DTSTAMP:'+d0+'T000000','DTSTART:'+d0+'T'+t,'DURATION:PT5M','RRULE:FREQ='+rr,'SUMMARY:'+title,'DESCRIPTION:'+desc+'\\nOpen Summit from your Home Screen.','URL:'+url,'TRANSP:TRANSPARENT',
+      'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:'+title,'TRIGGER:PT0M','END:VALARM','END:VEVENT'].join('\r\n'); });
+  if(!ev.length) return toast('Set at least one reminder time');
+  const ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Summit//Reminders//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH',...ev,'END:VCALENDAR'].join('\r\n');
+  const file=new File([ics],'summit-reminders.ics',{type:'text/calendar'});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){ navigator.share({files:[file],title:'Summit reminders'}).catch(()=>{}); }
+  else { const a=document.createElement('a'); a.href=URL.createObjectURL(file); a.download='summit-reminders.ics'; document.body.appendChild(a); a.click(); a.remove(); }
+  $('remStatus').innerHTML=`Created ${ev.length} repeating reminders. In the share sheet choose <b>Save to Files</b>, then open the file in Files and tap <b>Add All</b>. To change times later, delete the old "Summit" events in Calendar and add the new file.`;
+}
+/* ---------- DIAGNOSTICS ---------- */
+function renderDiag(){
+  const standalone=navigator.standalone||matchMedia('(display-mode: standalone)').matches, kb=r0((localStorage.getItem(KEY)||'').length/1024);
+  const ld=[...new Set(S.labs.map(x=>x.date))].sort();
+  $('diag').innerHTML=`<table>
+    <tr><td>Version</td><td><b>${APP_VERSION}</b> · coach ${typeof getInsights==='function'?'✓ loaded':'<span class="flag">missing</span>'}</td></tr>
+    <tr><td>Running as</td><td>${standalone?'Home Screen app ✓':'<span class="flag">Safari browser</span> – data here is separate from your Home Screen app'}</td></tr>
+    <tr><td>Lab results</td><td>${S.labs.length}${ld.length?' (draws: '+ld.map(d=>fmtDate(d)+' '+d.slice(0,4)).join(', ')+')':''}</td></tr>
+    <tr><td>Sleep nights</td><td>${S.sleep.length}</td></tr><tr><td>Food days</td><td>${Object.keys(S.food).filter(d=>S.food[d].length).length}</td></tr>
+    <tr><td>Water days</td><td>${Object.keys(S.water||{}).length}</td></tr><tr><td>Activities</td><td>${S.activities.length}</td></tr>
+    <tr><td>Storage used</td><td>${kb} KB</td></tr></table>`;
+}
 /* ---------- RENDER / BOOT ---------- */
 function render(){
   const r=nextRace(); $('hdrRace').innerHTML=r?`<b style="color:var(--gold);font-size:18px">${daysBetween(today(),r.date)}</b><br>days to ${esc(r.name.split(' ')[0])}`:'';
   const v=document.querySelector('.view.on').id;
+  updateBadge();
   if(v==='v-today')renderToday(); if(v==='v-train')renderTrain(); if(v==='v-race')renderRace(); if(v==='v-health')renderHealth(); if(v==='v-set')fillSettings();
 }
 function boot(){
-  if(typeof LAB_GUIDE!=='undefined') LAB_GUIDE.unshift(
-    {re:/non-?hdl/i, hi:'Non-HDL cholesterol (total minus HDL) captures all the cholesterol types that can build up in arteries. The same levers as LDL apply: more fiber, swapping saturated fat for unsaturated fat, and consistent cardio.'},
-    {re:/^wbc\b|white blood/i, lo:'A mildly low white blood cell count can show up in endurance athletes, after a recent illness, or simply as your normal baseline. Ask your doctor whether it should be rechecked, especially if you get sick often.', hi:'A high white blood cell count can reflect infection, inflammation, or a very hard workout before the draw.'},
-    {re:/alanine aminotransferase/i, hi:'ALT can rise after very hard training. If you trained hard in the 48 hours before the draw, ask about a retest after 2–3 easy days.'},
-    {re:/aspartate aminotransferase/i, hi:'AST is also released by muscle, so hard OTF or race efforts can push it up temporarily.'},
-    {re:/ldl/i, hi:'High LDL: favor fiber (oats, beans, berries), swap saturated fats for olive oil, nuts and fish, and keep cardio consistent.'});
   advancePlan(); applyTheme();
   const code=new URLSearchParams(location.search).get('code');
   if(code){ history.replaceState(null,'',location.pathname);
@@ -640,6 +747,11 @@ function boot(){
       <input value="${esc(code)}" style="width:100%;font-size:18px;padding:12px" onclick="this.select()"><button style="margin-top:12px;padding:12px 18px" onclick="navigator.clipboard.writeText('${esc(code)}').then(()=>this.textContent='Copied!')">Copy code</button></div>`; return; }
   }
   render();
+  const goP=new URLSearchParams(location.search).get('go'); if(goP){ history.replaceState(null,'',location.pathname);
+    ({sleep:()=>openSleep(),food:()=>openFood(),bp:()=>openSheet('bpSheet'),labs:()=>{go('health');openSheet('labSheet');},coach:()=>openReport&&openReport(),water:()=>$('waterCard').scrollIntoView()}[goP]||(()=>{}))(); }
   if(S.strava.refresh&&(!S.strava.lastSync||Date.now()-S.strava.lastSync>6*3600e3)) stravaSync();
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+  if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js');
+    navigator.serviceWorker.addEventListener('message',e=>{ const g=e.data&&e.data.go; if(g) location.href=location.pathname+'?go='+g; }); }
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'){ day=today(); render(); pushStatus(); } else updateBadge(); });
+  updateBadge(); pushStatus();
 }
